@@ -1,0 +1,66 @@
+local utils = require('utils')
+
+local root_dir = utils.script_path()
+local src_dir = root_dir .. "src/"
+local build_dir = root_dir .. "build/"
+local test_dir = root_dir .. "test/"
+local tools_dir = root_dir .. "tools/"
+
+utils.create_user_command("Build",
+function()
+  local build_win_name = "build"
+  local cmd = "cd " .. root_dir .. " && ./build.sh"
+  utils.tmux_new_window(build_win_name, "zsh", root_dir)
+  utils.tmux_exit_copy_mode(build_win_name, root_dir)
+  utils.tmux_send_keys(build_win_name, cmd, root_dir)
+end, 0)
+
+utils.create_user_command("Debug",
+function()
+  local debug_win_name = "debug"
+  local cmd = "./debug.sh"
+  utils.tmux_new_window(debug_win_name, "zsh", root_dir)
+  utils.tmux_exit_copy_mode(debug_win_name, root_dir)
+  utils.tmux_send_keys(debug_win_name, cmd, root_dir)
+end, 0)
+
+utils.create_user_command("Run",
+function()
+  local run_win_name = "run"
+  local cmd = "./run.sh"
+  utils.tmux_new_window(run_win_name, "zsh", root_dir)
+  utils.tmux_exit_copy_mode(run_win_name, root_dir)
+  utils.tmux_send_keys(run_win_name, cmd, root_dir)
+end, 0)
+
+-- create a temp workspace window for do something
+utils.create_user_command("Temp",
+function()
+  local temp_win_name = "temp"
+  local home_dir = os.getenv("HOME")
+  utils.tmux_new_window(temp_win_name, "zsh", home_dir .. "/workspace/tmp")
+end, 0)
+
+utils.create_user_command("Test",
+function()
+  local win_name = "test"
+  local cmd = "cd " .. root_dir .. " && ./test.sh"
+  utils.tmux_new_window(win_name, "zsh", root_dir)
+  utils.tmux_exit_copy_mode(win_name, root_dir)
+  utils.tmux_send_keys(win_name, cmd, root_dir)
+end, 0)
+
+utils.keymap("n", "<F10>",
+function()
+  vim.cmd("Build")
+end)
+
+utils.keymap("n", "<F9>",
+function()
+  vim.cmd("Run")
+end)
+
+utils.keymap("n", "<F8>",
+function()
+  vim.cmd("Debug")
+end)
