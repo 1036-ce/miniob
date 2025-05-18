@@ -35,12 +35,11 @@ See the Mulan PSL v2 for more details. */
 #include "storage/table/heap_table_engine.h"
 #include "storage/table/lsm_table_engine.h"
 
-Table::~Table()
-{
-}
+Table::~Table() {}
 
 RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, const char *base_dir,
-    span<const AttrInfoSqlNode> attributes, const vector<string> &primary_keys, StorageFormat storage_format, StorageEngine storage_engine)
+    span<const AttrInfoSqlNode> attributes, const vector<string> &primary_keys, StorageFormat storage_format,
+    StorageEngine storage_engine)
 {
   if (table_id < 0) {
     LOG_WARN("invalid table id. table_id=%d, table_name=%s", table_id, name);
@@ -76,7 +75,8 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
 
   // 创建文件
   const vector<FieldMeta> *trx_fields = db->trx_kit().trx_fields();
-  if ((rc = table_meta_.init(table_id, name, trx_fields, attributes, primary_keys, storage_format, storage_engine)) != RC::SUCCESS) {
+  if ((rc = table_meta_.init(table_id, name, trx_fields, attributes, primary_keys, storage_format, storage_engine)) !=
+      RC::SUCCESS) {
     LOG_ERROR("Failed to init table meta. name:%s, ret:%d", name, rc);
     return rc;  // delete table file
   }
@@ -92,7 +92,7 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
   table_meta_.serialize(fs);
   fs.close();
 
-  db_       = db;
+  db_ = db;
 
   string             data_file = table_data_file(base_dir, name);
   BufferPoolManager &bpm       = db->buffer_pool_manager();
@@ -128,6 +128,7 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
   return rc;
 }
 
+
 RC Table::open(Db *db, const char *meta_file, const char *base_dir)
 {
   // 加载元数据文件
@@ -145,7 +146,7 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
   }
   fs.close();
 
-  db_       = db;
+  db_ = db;
 
   // // 加载数据文件
   // RC rc = init_record_handler(base_dir);
@@ -158,7 +159,7 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
 
   if (table_meta_.storage_engine() == StorageEngine::HEAP) {
     engine_ = make_unique<HeapTableEngine>(&table_meta_, db_, this);
-  }  else if (table_meta_.storage_engine() == StorageEngine::LSM) {
+  } else if (table_meta_.storage_engine() == StorageEngine::LSM) {
     engine_ = make_unique<LsmTableEngine>(&table_meta_, db_, this);
   } else {
     rc = RC::UNSUPPORTED;
@@ -175,34 +176,22 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
   return rc;
 }
 
-RC Table::insert_record(Record &record)
-{
-  return engine_->insert_record(record);
-}
+RC Table::insert_record(Record &record) { return engine_->insert_record(record); }
 
-RC Table::visit_record(const RID &rid, function<bool(Record &)> visitor)
-{
-  return engine_->visit_record(rid, visitor);
-}
+RC Table::visit_record(const RID &rid, function<bool(Record &)> visitor) { return engine_->visit_record(rid, visitor); }
 
-RC Table::insert_record_with_trx(Record &record, Trx *trx)
-{
-  return engine_->insert_record_with_trx(record, trx);
-}
+RC Table::insert_record_with_trx(Record &record, Trx *trx) { return engine_->insert_record_with_trx(record, trx); }
 RC Table::delete_record_with_trx(const Record &record, Trx *trx)
 {
   return engine_->delete_record_with_trx(record, trx);
 }
 
-RC Table::update_record_with_trx(const Record &old_record, const Record &new_record, Trx* trx)
+RC Table::update_record_with_trx(const Record &old_record, const Record &new_record, Trx *trx)
 {
   return engine_->update_record_with_trx(old_record, new_record, trx);
 }
 
-RC Table::get_record(const RID &rid, Record &record)
-{
-  return engine_->get_record(rid, record);
-}
+RC Table::get_record(const RID &rid, Record &record) { return engine_->get_record(rid, record); }
 
 const char *Table::name() const { return table_meta_.name(); }
 
@@ -225,7 +214,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
 
   for (int i = 0; i < value_num && OB_SUCC(rc); i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
-    const Value &    value = values[i];
+    const Value     &value = values[i];
     if (field->type() != value.attr_type()) {
       Value real_value;
       rc = Value::cast_to(value, field->type(), real_value);
@@ -277,21 +266,9 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
   return engine_->create_index(trx, field_meta, index_name);
 }
 
-RC Table::delete_record(const Record &record)
-{
-  return engine_->delete_record(record);
-}
+RC Table::delete_record(const Record &record) { return engine_->delete_record(record); }
 
-Index *Table::find_index(const char *index_name) const
-{
-  return engine_->find_index(index_name);
-}
-Index *Table::find_index_by_field(const char *field_name) const
-{
-  return engine_->find_index_by_field(field_name);
-}
+Index *Table::find_index(const char *index_name) const { return engine_->find_index(index_name); }
+Index *Table::find_index_by_field(const char *field_name) const { return engine_->find_index_by_field(field_name); }
 
-RC Table::sync()
-{
-  return engine_->sync();
-}
+RC Table::sync() { return engine_->sync(); }

@@ -50,6 +50,15 @@ function()
   utils.tmux_send_keys(win_name, cmd, root_dir)
 end, 0)
 
+utils.create_user_command("Log",
+function()
+  local win_name = "log"
+  local cmd = "cd " .. root_dir .. " && tail -f ./observer.log.*"
+  utils.tmux_new_window(win_name, "zsh", root_dir)
+  utils.tmux_exit_copy_mode(win_name, root_dir)
+  utils.tmux_send_keys(win_name, cmd, root_dir)
+end, 0)
+
 utils.keymap("n", "<F10>",
 function()
   vim.cmd("Build")
@@ -64,3 +73,5 @@ utils.keymap("n", "<F8>",
 function()
   vim.cmd("Debug")
 end)
+
+utils.print_err(".nvim is loaded")
