@@ -35,6 +35,7 @@ public:
   friend class BooleanType;
   friend class CharType;
   friend class VectorType;
+  friend class DateType;
 
   Value() = default;
 
@@ -112,6 +113,7 @@ public:
 
 public:
   void set_int(int val);
+  void set_date(int date);
   void set_float(float val);
   void set_string(const char *s, int len = 0);
   void set_string_from_other(const Value &other);
@@ -123,6 +125,7 @@ private:
   union Val
   {
     int32_t int_value_;
+    int32_t date_value_;
     float   float_value_;
     bool    bool_value_;
     char   *pointer_value_;
