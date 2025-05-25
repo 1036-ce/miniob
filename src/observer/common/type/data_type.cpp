@@ -8,6 +8,7 @@ EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
 MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 See the Mulan PSL v2 for more details. */
 
+#include "common/type/bitmap_type.h"
 #include "common/type/char_type.h"
 #include "common/type/date_type.h"
 #include "common/type/float_type.h"
@@ -23,4 +24,5 @@ array<unique_ptr<DataType>, static_cast<int>(AttrType::MAXTYPE)> DataType::type_
     make_unique<VectorType>(),
     make_unique<DataType>(AttrType::BOOLEANS),
     make_unique<DateType>(),
+    make_unique<BitmapType>(),
 };

@@ -1,0 +1,6 @@
+#pragma once
+
+#include "common/lang/string.h"
+
+constexpr static const char* NULL_BITMAP_FIELD_NAME = "__null_bitmap";
+constexpr static int NULL_BITMAP_FIELD_ID = (1 << 16);

@@ -41,6 +41,10 @@ struct FilterObj
     is_attr     = false;
     this->value = value;
   }
+
+  AttrType value_type() {
+    return is_attr ? field.attr_type() : value.attr_type();
+  }
 };
 
 class FilterUnit
@@ -86,5 +90,8 @@ public:
       const ConditionSqlNode &condition, FilterUnit *&filter_unit);
 
 private:
+  // 检查比较是否合法
+  static RC check(const FilterUnit& filter_unit);
+
   vector<FilterUnit *> filter_units_;  // 默认当前都是AND关系
 };

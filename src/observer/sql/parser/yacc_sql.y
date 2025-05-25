@@ -109,6 +109,9 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         PRIMARY
         KEY
         ANALYZE
+        NOT
+        NULL_T
+        IS_T
         EQ
         LT
         GT
@@ -135,6 +138,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   char *                                     cstring;
   int                                        number;
   float                                      floats;
+  bool                                       boolean;
 }
 
 %token <number> NUMBER
@@ -144,6 +148,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 //非终结符
 
 /** type 定义了各种解析后的结果输出的是什么类型。类型对应了 union 中的定义的成员变量名称 **/
+%type <boolean>             null_opt;
 %type <number>              type
 %type <condition>           condition
 %type <value>               value
@@ -347,21 +352,38 @@ attr_def_list:
       delete $3;
     }
     ;
-    
+
+null_opt:    
+    /* empty */
+    {
+      $$ = true;
+    }
+    | NULL_T
+    {
+      $$ = true;
+    }
+    | NOT NULL_T
+    {
+      $$ = false;
+    }
+    ;
+
 attr_def:
-    ID type LBRACE number RBRACE 
+    ID type LBRACE number RBRACE null_opt
     {
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = $4;
+      $$->nullable = $6;
     }
-    | ID type
+    | ID type null_opt
     {
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = 4;
+      $$->nullable = $3;
     }
     ;
 number:
@@ -444,6 +466,11 @@ value:
       char *tmp = common::substr($1,1,strlen($1)-2);
       $$ = new Value(tmp);
       free(tmp);
+    }
+    |NULL_T {
+      $$ = new Value((int)0);
+      $$->set_null(true);
+      @$ = @1;
     }
     ;
 storage_format:
@@ -684,6 +711,8 @@ comp_op:
     | LE { $$ = LESS_EQUAL; }
     | GE { $$ = GREAT_EQUAL; }
     | NE { $$ = NOT_EQUAL; }
+    | IS_T { $$ = IS; }
+    | IS_T NOT { $$ = IS_NOT; }
     ;
 
 // your code here

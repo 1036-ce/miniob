@@ -14,6 +14,8 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include "common/config.h"
+#include "common/lang/bitmap.h"
 #include "common/log/log.h"
 #include "sql/expr/expression.h"
 #include "sql/expr/tuple_cell.h"
@@ -198,6 +200,9 @@ public:
     cell.reset();
     cell.set_type(field_meta->type());
     cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
+    if (field_meta->field_id() != NULL_BITMAP_FIELD_ID) {
+      cell.set_null(is_null_at(index));
+    }
     return RC::SUCCESS;
   }
 
@@ -243,6 +248,30 @@ public:
   const Record &record() const { return *record_; }
 
 private:
+
+  bool is_null_at(int index) const {
+    // get `__null_bimap` field
+    Value null_bitmap_val(false);
+    int null_bitmap_field_index = -1;
+    for (const auto& spece: speces_) {
+      const auto& field_meta = spece->field().meta();
+      ++null_bitmap_field_index;
+      if (field_meta->field_id() == NULL_BITMAP_FIELD_ID) {
+        null_bitmap_val.set_bitmap(this->record_->data() + field_meta->offset(), field_meta->len());
+        break;
+      }
+    }
+
+    // `__null_bimap` not exist
+    if (null_bitmap_val.attr_type() == AttrType::BOOLEANS && false == null_bitmap_val.get_boolean()) {
+      return false;
+    }
+
+    common::Bitmap null_bitmap(null_bitmap_val.get_bitmap_data(), null_bitmap_val.length());
+
+    return null_bitmap.get_bit(index - null_bitmap_field_index - 1);
+  }
+
   Record             *record_ = nullptr;
   const Table        *table_  = nullptr;
   vector<FieldExpr *> speces_;

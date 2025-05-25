@@ -41,10 +41,19 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
   const Value     *values     = inserts.values.data();
   const int        value_num  = static_cast<int>(inserts.values.size());
   const TableMeta &table_meta = table->table_meta();
-  const int        field_num  = table_meta.field_num() - table_meta.sys_field_num();
-  if (field_num != value_num) {
-    LOG_WARN("schema mismatch. value num=%d, field num in schema=%d", value_num, field_num);
+  const int        visible_field_num  = table_meta.visible_field_num();
+  if (visible_field_num != value_num) {
+    LOG_WARN("schema mismatch. value num=%d, field num in schema=%d", value_num, visible_field_num);
     return RC::SCHEMA_FIELD_MISSING;
+  } 
+
+  // check whether value can be null
+  const int unvisible_field_num = table_meta.unvisible_field_num();
+  for (int i = unvisible_field_num; i < table_meta.field_num(); ++i) {
+    const FieldMeta *field_meta = table_meta.field(i);
+    if (!field_meta->nullable() && values[i - unvisible_field_num].is_null()) {
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
   }
 
   // everything alright

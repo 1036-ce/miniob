@@ -55,6 +55,8 @@ public:
 
   int field_num() const;  // sys field included
   int sys_field_num() const;
+  int unvisible_field_num() const;
+  int visible_field_num() const;
 
   const IndexMeta *index(const char *name) const;
   const IndexMeta *find_index_by_field(const char *field) const;
@@ -64,6 +66,8 @@ public:
   const vector<string> &primary_keys() const { return primary_keys_; }
 
   int record_size() const;
+
+  bool has_nullable_field() const;
 
 public:
   int  serialize(ostream &os) const override;

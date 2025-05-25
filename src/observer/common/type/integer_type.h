@@ -31,6 +31,9 @@ public:
 
   RC cast_to(const Value &val, AttrType type, Value &result) const override;
 
+  // only be used in LogicalPlanGenerator::create_plan
+  int cast_cost(AttrType type) override;
+
   RC set_value_from_str(Value &val, const string &data) const override;
 
   RC to_string(const Value &val, string &result) const override;

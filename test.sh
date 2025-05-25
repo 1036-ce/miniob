@@ -2,4 +2,4 @@
 
 cd test/case
 
-python3 ./miniob_test.py --test-cases=primary-drop-table,basic,primary-date
+python3 ./miniob_test.py --test-cases=primary-drop-table,basic,primary-date,primary-pure-null

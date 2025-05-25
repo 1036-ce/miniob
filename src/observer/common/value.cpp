@@ -33,9 +33,13 @@ Value::Value(const Value &other)
   this->attr_type_ = other.attr_type_;
   this->length_    = other.length_;
   this->own_data_  = other.own_data_;
+  this->is_null_   = other.is_null_;
   switch (this->attr_type_) {
     case AttrType::CHARS: {
       set_string_from_other(other);
+    } break;
+    case AttrType::BITMAP: {
+      set_bitmap_from_other(other);
     } break;
 
     default: {
@@ -50,6 +54,7 @@ Value::Value(Value &&other)
   this->length_    = other.length_;
   this->own_data_  = other.own_data_;
   this->value_     = other.value_;
+  this->is_null_   = other.is_null_;
   other.own_data_  = false;
   other.length_    = 0;
 }
@@ -63,9 +68,13 @@ Value &Value::operator=(const Value &other)
   this->attr_type_ = other.attr_type_;
   this->length_    = other.length_;
   this->own_data_  = other.own_data_;
+  this->is_null_   = other.is_null_;
   switch (this->attr_type_) {
     case AttrType::CHARS: {
       set_string_from_other(other);
+    } break;
+    case AttrType::BITMAP: {
+      set_bitmap_from_other(other);
     } break;
 
     default: {
@@ -85,6 +94,7 @@ Value &Value::operator=(Value &&other)
   this->length_    = other.length_;
   this->own_data_  = other.own_data_;
   this->value_     = other.value_;
+  this->is_null_   = other.is_null_;
   other.own_data_  = false;
   other.length_    = 0;
   return *this;
@@ -99,12 +109,19 @@ void Value::reset()
         value_.pointer_value_ = nullptr;
       }
       break;
+    case AttrType::BITMAP:
+      if (own_data_ && value_.pointer_value_ != nullptr) {
+        delete[] value_.pointer_value_;
+        value_.pointer_value_ = nullptr;
+      }
+      break;
     default: break;
   }
 
   attr_type_ = AttrType::UNDEFINED;
   length_    = 0;
   own_data_  = false;
+  is_null_   = false;
 }
 
 void Value::set_data(char *data, int length)
@@ -128,6 +145,9 @@ void Value::set_data(char *data, int length)
     case AttrType::DATES: {
       value_.date_value_ = *(int *)data;
       length_            = length;
+    } break;
+    case AttrType::BITMAP: {
+      set_bitmap(data, length);
     } break;
     default: {
       LOG_WARN("unknown data type: %d", attr_type_);
@@ -218,10 +238,39 @@ void Value::set_string_from_other(const Value &other)
   }
 }
 
+void Value::set_bitmap(const char *s, int len)
+{
+  reset();
+  attr_type_ = AttrType::BITMAP;
+  if (s == nullptr) {
+    value_.pointer_value_ = nullptr;
+    length_               = 0;
+  } else {
+    own_data_             = true;
+    value_.pointer_value_ = new char[len];
+    length_               = len;
+    memcpy(value_.pointer_value_, s, len);
+  }
+}
+
+void Value::set_bitmap_from_other(const Value &other)
+{
+  ASSERT(attr_type_ == AttrType::BITMAP, "attr type is not BITMAP");
+  if (own_data_ && other.value_.pointer_value_ != nullptr && length_ != 0) {
+    this->value_.pointer_value_ = new char[this->length_];
+    memcpy(this->value_.pointer_value_, other.value_.pointer_value_, this->length_);
+  }
+}
+
+void Value::set_null(bool is_null) { is_null_ = is_null; }
+
 const char *Value::data() const
 {
   switch (attr_type_) {
     case AttrType::CHARS: {
+      return value_.pointer_value_;
+    } break;
+    case AttrType::BITMAP: {
       return value_.pointer_value_;
     } break;
     default: {
@@ -232,6 +281,9 @@ const char *Value::data() const
 
 string Value::to_string() const
 {
+  if (is_null_) {
+    return "null";
+  }
   string res;
   RC     rc = DataType::type_instance(this->attr_type_)->to_string(*this, res);
   if (OB_FAIL(rc)) {
@@ -341,4 +393,13 @@ bool Value::get_boolean() const
     }
   }
   return false;
+}
+
+char *Value::get_bitmap_data()
+{
+  if (attr_type_ != AttrType::BITMAP) {
+    LOG_DEBUG("AttrType::%s cannot get bitmap data", attr_type_to_string(attr_type_));
+    return nullptr;
+  }
+  return value_.pointer_value_;
 }

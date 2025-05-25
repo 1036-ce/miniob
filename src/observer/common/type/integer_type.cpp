@@ -30,15 +30,52 @@ int IntegerType::compare(const Value &left, const Value &right) const
 
 RC IntegerType::cast_to(const Value &val, AttrType type, Value &result) const
 {
-  switch (type) {
-  case AttrType::FLOATS: {
-    float float_value = val.get_int();
-    result.set_float(float_value);
-    return RC::SUCCESS;
+  if (val.is_null()) {
+    switch (type) {
+      case AttrType::FLOATS: {
+        result = Value::default_float();
+        result.set_null(true);
+        return RC::SUCCESS;
+      }
+      case AttrType::DATES: {
+        result = Value::default_date();
+        result.set_null(true);
+        return RC::SUCCESS;
+      }
+      case AttrType::CHARS: {
+        result = Value::default_char();
+        result.set_null(true);
+        return RC::SUCCESS;
+      }
+      case AttrType::BITMAP: {
+        result = Value::default_bitmap();
+        result.set_null(true);
+        return RC::SUCCESS;
+      }
+      default: LOG_WARN("unsupported type %d", type); return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
   }
-  default:
-    LOG_WARN("unsupported type %d", type);
-    return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+  switch (type) {
+    case AttrType::FLOATS: {
+      float float_value = val.get_int();
+      result.set_float(float_value);
+      return RC::SUCCESS;
+    }
+    default: LOG_WARN("unsupported type %d", type); return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+  }
+}
+
+int IntegerType::cast_cost(AttrType type) {
+  switch (type) {
+    case AttrType::INTS: 
+      return 0;
+    case AttrType::FLOATS:
+    case AttrType::CHARS:
+    case AttrType::DATES:
+    case AttrType::BITMAP:
+      return 2;
+    default:
+      return INT32_MAX;
   }
 }
 
@@ -68,7 +105,7 @@ RC IntegerType::negative(const Value &val, Value &result) const
 
 RC IntegerType::set_value_from_str(Value &val, const string &data) const
 {
-  RC                rc = RC::SUCCESS;
+  RC           rc = RC::SUCCESS;
   stringstream deserialize_stream;
   deserialize_stream.clear();  // 清理stream的状态，防止多次解析出现异常
   deserialize_stream.str(data);

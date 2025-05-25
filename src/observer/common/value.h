@@ -36,6 +36,7 @@ public:
   friend class CharType;
   friend class VectorType;
   friend class DateType;
+  friend class BitmapType;
 
   Value() = default;
 
@@ -86,6 +87,26 @@ public:
     return DataType::type_instance(value.attr_type())->cast_to(value, to_type, result);
   }
 
+  static Value default_integer() {
+    return Value(static_cast<int>(0));
+  }
+  static Value default_float() {
+    return Value(static_cast<float>(0));
+  }
+  static Value default_date() {
+    Value ret;
+    ret.set_date(0);
+    return ret;
+  }
+  static Value default_char() {
+    return Value("a", 1);
+  }
+  static Value default_bitmap() {
+    Value ret;
+    ret.set_bitmap("0", 1);
+    return ret;
+  }
+
   void set_type(AttrType type) { this->attr_type_ = type; }
   void set_data(char *data, int length);
   void set_data(const char *data, int length) { this->set_data(const_cast<char *>(data), length); }
@@ -100,6 +121,7 @@ public:
 
   int      length() const { return length_; }
   AttrType attr_type() const { return attr_type_; }
+  bool     is_null() const { return is_null_; }
 
 public:
   /**
@@ -111,12 +133,17 @@ public:
   string get_string() const;
   bool   get_boolean() const;
 
+  char* get_bitmap_data();
+
 public:
   void set_int(int val);
   void set_date(int date);
   void set_float(float val);
   void set_string(const char *s, int len = 0);
   void set_string_from_other(const Value &other);
+  void set_bitmap(const char *s, int len);
+  void set_bitmap_from_other(const Value &other);
+  void set_null(bool is_null);
 
 private:
   AttrType attr_type_ = AttrType::UNDEFINED;
@@ -133,4 +160,6 @@ private:
 
   /// 是否申请并占有内存, 目前对于 CHARS 类型 own_data_ 为true, 其余类型 own_data_ 为false
   bool own_data_ = false;
+
+  bool is_null_ = false;
 };

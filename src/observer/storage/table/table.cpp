@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #include <limits.h>
 #include <string.h>
 
+#include "common/config.h"
 #include "common/defs.h"
 #include "common/lang/string.h"
 #include "common/lang/span.h"
@@ -128,7 +129,6 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
   return rc;
 }
 
-
 RC Table::open(Db *db, const char *meta_file, const char *base_dir)
 {
   // 加载元数据文件
@@ -199,18 +199,48 @@ const TableMeta &Table::table_meta() const { return table_meta_; }
 
 RC Table::make_record(int value_num, const Value *values, Record &record)
 {
-  RC rc = RC::SUCCESS;
+  RC  rc                 = RC::SUCCESS;
+  int has_nullable_field = static_cast<int>(table_meta_.has_nullable_field());
+
   // 检查字段类型是否一致
-  if (value_num + table_meta_.sys_field_num() != table_meta_.field_num()) {
+  if (value_num + table_meta_.sys_field_num() != table_meta_.field_num() - has_nullable_field) {
     LOG_WARN("Input values don't match the table's schema, table name:%s", table_meta_.name());
     return RC::SCHEMA_FIELD_MISSING;
   }
 
-  const int normal_field_start_index = table_meta_.sys_field_num();
+  const int normal_field_start_index = table_meta_.sys_field_num() + has_nullable_field;
   // 复制所有字段的值
   int   record_size = table_meta_.record_size();
   char *record_data = (char *)malloc(record_size);
   memset(record_data, 0, record_size);
+
+  // 如果有`__null_bitmap`字段，制作bitmap类型的值并填充该字段
+  if (has_nullable_field == 1) {
+    const FieldMeta *field = table_meta_.field(NULL_BITMAP_FIELD_NAME);
+    // allocate mem for bitmap
+    char *data = new char[field->len()];
+
+    common::Bitmap bitmap(data, field->len());
+    bitmap.clear_all();
+    for (int i = 0; i < value_num; ++i) {
+      const Value &value = values[i];
+      if (value.is_null()) {
+        bitmap.set_bit(i);
+      }
+    }
+    Value null_bitmap_val;
+    null_bitmap_val.set_bitmap(bitmap.data(), field->len());
+    LOG_DEBUG("make __null_bitmap field: %s", null_bitmap_val.to_string().c_str());
+
+    // free mem of bitmap
+    delete[] data;
+    rc = set_value_to_record(record_data, null_bitmap_val, field);
+    if (OB_FAIL(rc)) {
+      LOG_WARN("failed to make record. table name:%s", table_meta_.name());
+      free(record_data);
+      return rc;
+    }
+  }
 
   for (int i = 0; i < value_num && OB_SUCC(rc); i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);

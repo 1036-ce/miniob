@@ -122,6 +122,19 @@ ComparisonExpr::~ComparisonExpr() {}
 RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &result) const
 {
   RC  rc         = RC::SUCCESS;
+  if (comp_ == CompOp::IS) {
+    result = left.is_null();
+    return rc;
+  }
+  if (comp_ == CompOp::IS_NOT) {
+    result = !left.is_null();
+    return rc;
+  }
+  if (left.is_null() || right.is_null()) {
+    result = false;
+    return rc;
+  }
+
   int cmp_result = left.compare(right);
   result         = false;
   switch (comp_) {

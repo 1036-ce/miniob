@@ -128,5 +128,21 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, unordered_map<st
   filter_unit->set_comp(comp);
 
   // 检查两个类型是否能够比较
+  rc = check(*filter_unit);
+
   return rc;
+}
+
+RC FilterStmt::check(const FilterUnit& filter_unit) {
+  const FilterObj& rhs = filter_unit.right();
+  CompOp comp = filter_unit.comp();
+
+  if (comp == CompOp::IS || comp == CompOp::IS_NOT) {
+    if (rhs.is_attr || !rhs.value.is_null()) {
+      LOG_DEBUG("(is)/(is not) must follwed by null");
+      return RC::SQL_SYNTAX;
+    }
+  }
+
+  return RC::SUCCESS;
 }

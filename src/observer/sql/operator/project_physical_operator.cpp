@@ -63,8 +63,22 @@ Tuple *ProjectPhysicalOperator::current_tuple()
 
 RC ProjectPhysicalOperator::tuple_schema(TupleSchema &schema) const
 {
+  set<string> table_names;
   for (const unique_ptr<Expression> &expression : expressions_) {
-    schema.append_cell(expression->name());
+    if (expression->type() == ExprType::FIELD) {
+      auto field_expr = static_cast<FieldExpr*>(expression.get());
+      table_names.insert(field_expr->table_name());
+    }
+  }
+
+  for (const unique_ptr<Expression> &expression : expressions_) {
+    if (expression->type() == ExprType::FIELD && table_names.size() > 1) {
+      auto field_expr = static_cast<FieldExpr*>(expression.get());
+      schema.append_cell(field_expr->table_name(), field_expr->field_name());
+    }
+    else {
+      schema.append_cell(expression->name());
+    }
   }
   return RC::SUCCESS;
 }
