@@ -97,6 +97,16 @@ RC IntegerType::multiply(const Value &left, const Value &right, Value &result) c
   return RC::SUCCESS;
 }
 
+RC IntegerType::divide(const Value &left, const Value &right, Value &result) const {
+  if (right.get_float() > -EPSILON && right.get_float() < EPSILON) {
+    result.set_type(AttrType::INTS);
+    result.set_null(true);
+  } else {
+    result.set_float(left.get_float() / right.get_float());
+  }
+  return RC::SUCCESS;
+}
+
 RC IntegerType::negative(const Value &val, Value &result) const
 {
   result.set_int(-val.get_int());

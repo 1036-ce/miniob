@@ -171,7 +171,14 @@ RC ExpressionBinder::bind_unbound_field_expression(
 
     Field      field(table, field_meta);
     FieldExpr *field_expr = new FieldExpr(field);
-    field_expr->set_name(field_name);
+
+    // 如果一个查询中涉及到2个或以上表，schema中需要给出表名
+    if (context_.query_tables().size() > 1) {
+      field_expr->set_name(unbound_field_expr->name());
+    }
+    else {
+      field_expr->set_name(field_name);
+    }
     bound_expressions.emplace_back(field_expr);
   }
 

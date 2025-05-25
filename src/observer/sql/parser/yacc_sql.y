@@ -166,6 +166,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <key_list>            attr_list
 %type <relation_list>       rel_list
 %type <expression>          expression
+%type <expression>          aggre_expr
+%type <cstring>             aggre_name
 %type <expression_list>     expression_list
 %type <expression_list>     group_by
 %type <sql_node>            calc_stmt
@@ -592,7 +594,23 @@ expression:
     | '*' {
       $$ = new StarExpr();
     }
+    | aggre_expr {
+      $$ = $1;
+    }
     // your code here
+    ;
+
+aggre_expr:
+    /* empty */
+    aggre_name LBRACE expression RBRACE {
+      $$ = new UnboundAggregateExpr($1, $3);
+      $$->set_name(token_name(sql_string, &@$));
+    }
+
+aggre_name:
+    ID {
+      $$ = $1;
+    }
     ;
 
 rel_attr:
@@ -720,6 +738,9 @@ group_by:
     /* empty */
     {
       $$ = nullptr;
+    }
+    | GROUP BY expression_list {
+      $$ = $3;
     }
     ;
 load_data_stmt:
