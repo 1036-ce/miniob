@@ -127,15 +127,26 @@ struct DeleteSqlNode
 };
 
 /**
+ * @brief 描述一个Assignment, for example: id = 1;
+ * @ingroup SQLParser
+ */
+struct Assignment
+{
+  string      attribute_name;
+  Expression *expr;
+};
+
+/**
  * @brief 描述一个update语句
  * @ingroup SQLParser
  */
 struct UpdateSqlNode
 {
-  string                   relation_name;   ///< Relation to update
-  string                   attribute_name;  ///< 更新的字段，仅支持一个字段
-  Value                    value;           ///< 更新的值，仅支持一个字段
-  vector<ConditionSqlNode> conditions;
+  string                              relation_name;    ///< Relation to update
+  std::vector<unique_ptr<Assignment>> assignment_list;  ///< 更新的列表
+  vector<ConditionSqlNode>            conditions;       ///< 更新的条件
+  /* string                   attribute_name;  ///< 更新的字段，仅支持一个字段
+   * Value                    value;           ///< 更新的值，仅支持一个字段 */
 };
 
 /**
@@ -145,10 +156,10 @@ struct UpdateSqlNode
  */
 struct AttrInfoSqlNode
 {
-  AttrType type;     ///< Type of attribute
-  string   name;     ///< Attribute name
-  size_t   length;   ///< Length of attribute
-  bool     nullable; ///< Nullable
+  AttrType type;      ///< Type of attribute
+  string   name;      ///< Attribute name
+  size_t   length;    ///< Length of attribute
+  bool     nullable;  ///< Nullable
 };
 
 /**

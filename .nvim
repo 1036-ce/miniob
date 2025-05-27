@@ -73,5 +73,3 @@ utils.keymap("n", "<F8>",
 function()
   vim.cmd("Debug")
 end)
-
-utils.print_err(".nvim is loaded")

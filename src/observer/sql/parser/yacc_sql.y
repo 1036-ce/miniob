@@ -135,6 +135,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   vector<RelAttrSqlNode> *                   rel_attr_list;
   vector<string> *                           relation_list;
   vector<string> *                           key_list;
+  Assignment *                               assignment;
+  std::vector<unique_ptr<Assignment>> *      assignment_list;
   char *                                     cstring;
   int                                        number;
   float                                      floats;
@@ -170,6 +172,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <cstring>             aggre_name
 %type <expression_list>     expression_list
 %type <expression_list>     group_by
+%type <assignment>          assignment
+%type <assignment_list>     assignment_list
 %type <sql_node>            calc_stmt
 %type <sql_node>            select_stmt
 %type <sql_node>            insert_stmt
@@ -497,16 +501,56 @@ delete_stmt:    /*  delete 语句的语法解析树*/
       }
     }
     ;
+
+assignment:
+    ID EQ expression
+    {
+      $$ = new Assignment();
+      $$->attribute_name = $1;
+      $$->expr = $3;
+    }
+    ;
+assignment_list:
+    assignment 
+    {
+      $$ = new vector<unique_ptr<Assignment>>;
+      $$->emplace_back($1);
+    }
+    | assignment COMMA assignment_list
+    {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new vector<unique_ptr<Assignment>>;
+      }
+      $$->emplace($$->begin(), $1);
+    }
+    ;
+
+
 update_stmt:      /*  update 语句的语法解析树*/
-    UPDATE ID SET ID EQ value where 
+    // UPDATE relation SET ID EQ value where 
+    // {
+    //   $$ = new ParsedSqlNode(SCF_UPDATE);
+    //   $$->update.relation_name = $2;
+    //   $$->update.attribute_name = $4;
+    //   $$->update.value = *$6;
+    //   if ($7 != nullptr) {
+    //     $$->update.conditions.swap(*$7);
+    //     delete $7;
+    //   }
+    // }
+    UPDATE relation SET assignment_list where 
     {
       $$ = new ParsedSqlNode(SCF_UPDATE);
       $$->update.relation_name = $2;
-      $$->update.attribute_name = $4;
-      $$->update.value = *$6;
-      if ($7 != nullptr) {
-        $$->update.conditions.swap(*$7);
-        delete $7;
+      if ($4 != nullptr) {
+        $$->update.assignment_list.swap(*$4);
+        delete $4;
+      }
+      if ($5 != nullptr) {
+        $$->update.conditions.swap(*$5);
+        delete $5;
       }
     }
     ;

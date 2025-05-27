@@ -17,9 +17,11 @@ See the Mulan PSL v2 for more details. */
 #include "common/sys/rc.h"
 #include "sql/operator/logical_operator.h"
 #include "sql/operator/physical_operator.h"
+#include "sql/operator/update_logical_operator.h"
 
 class Session;
 class TableGetLogicalOperator;
+class UpdatePhysicalOperator;
 class PredicateLogicalOperator;
 class ProjectLogicalOperator;
 class InsertLogicalOperator;
@@ -46,6 +48,7 @@ public:
 
 private:
   RC create_plan(TableGetLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper, Session *session);
+  RC create_plan(UpdateLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper, Session *session);
   RC create_plan(PredicateLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper, Session *session);
   RC create_plan(ProjectLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper, Session *session);
   RC create_plan(InsertLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper, Session *session);
