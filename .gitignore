@@ -34,3 +34,4 @@ src/observer/sql/parser/yacc_sql.hpp
 miniob/*
 .gdbinit
 observer.log.*
+.miniob.history

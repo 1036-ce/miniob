@@ -168,7 +168,10 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <key_list>            attr_list
 %type <relation_list>       rel_list
 %type <expression>          expression
-%type <expression>          aggre_expr
+%type <expression>          boolean_primary
+%type <expression>          predicate
+%type <expression>          bit_expr
+%type <expression>          simple_expr
 %type <cstring>             aggre_name
 %type <expression_list>     expression_list
 %type <expression_list>     group_by
@@ -605,26 +608,53 @@ expression_list:
     }
     ;
 expression:
-    expression '+' expression {
-      $$ = create_arithmetic_expression(ArithmeticExpr::Type::ADD, $1, $3, sql_string, &@$);
+    boolean_primary {
+      $$ = $1;
     }
-    | expression '-' expression {
-      $$ = create_arithmetic_expression(ArithmeticExpr::Type::SUB, $1, $3, sql_string, &@$);
-    }
-    | expression '*' expression {
-      $$ = create_arithmetic_expression(ArithmeticExpr::Type::MUL, $1, $3, sql_string, &@$);
-    }
-    | expression '/' expression {
-      $$ = create_arithmetic_expression(ArithmeticExpr::Type::DIV, $1, $3, sql_string, &@$);
-    }
-    | LBRACE expression RBRACE {
-      $$ = $2;
+    ;
+
+boolean_primary:
+    boolean_primary comp_op predicate {
+      $$ = new ComparisonExpr($2, $1, $3);
       $$->set_name(token_name(sql_string, &@$));
     }
-    | '-' expression %prec UMINUS {
-      $$ = create_arithmetic_expression(ArithmeticExpr::Type::NEGATIVE, $2, nullptr, sql_string, &@$);
+    | predicate {
+      $$ = $1;
     }
-    | value {
+
+predicate:
+    bit_expr {
+      $$ = $1;
+    }
+    // | bit_expr LIKE simple_expr {
+    // }
+    // | bit_expr IN expression_list {
+    // }
+    // | bit_expr IN subquery {
+    // }
+    ;
+
+
+bit_expr:
+    bit_expr '+' bit_expr {
+      $$ = create_arithmetic_expression(ArithmeticExpr::Type::ADD, $1, $3, sql_string, &@$);
+    }
+    | bit_expr '-' bit_expr {
+      $$ = create_arithmetic_expression(ArithmeticExpr::Type::SUB, $1, $3, sql_string, &@$);
+    }
+    | bit_expr '*' bit_expr {
+      $$ = create_arithmetic_expression(ArithmeticExpr::Type::MUL, $1, $3, sql_string, &@$);
+    }
+    | bit_expr '/' bit_expr {
+      $$ = create_arithmetic_expression(ArithmeticExpr::Type::DIV, $1, $3, sql_string, &@$);
+    }
+    | simple_expr {
+      $$ = $1;
+    }
+    ;
+
+simple_expr:
+    value {
       $$ = new ValueExpr(*$1);
       $$->set_name(token_name(sql_string, &@$));
       delete $1;
@@ -638,18 +668,18 @@ expression:
     | '*' {
       $$ = new StarExpr();
     }
-    | aggre_expr {
-      $$ = $1;
+    | LBRACE expression RBRACE {
+      $$ = $2;
+      $$->set_name(token_name(sql_string, &@$));
     }
-    // your code here
-    ;
-
-aggre_expr:
-    /* empty */
-    aggre_name LBRACE expression RBRACE {
+    | '-' simple_expr %prec UMINUS {
+      $$ = create_arithmetic_expression(ArithmeticExpr::Type::NEGATIVE, $2, nullptr, sql_string, &@$);
+    }
+    | aggre_name LBRACE expression RBRACE {
       $$ = new UnboundAggregateExpr($1, $3);
       $$->set_name(token_name(sql_string, &@$));
     }
+    ;
 
 aggre_name:
     ID {
