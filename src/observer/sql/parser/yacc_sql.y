@@ -98,6 +98,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         FROM
         WHERE
         AND
+        OR
         SET
         ON
         LOAD
@@ -129,7 +130,6 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   AttrInfoSqlNode *                          attr_info;
   Expression *                               expression;
   vector<unique_ptr<Expression>> *           expression_list;
-  vector<Value> *                            value_list;
   vector<RelAttrSqlNode> *                   rel_attr_list;
   vector<string> *                           relation_list;
   vector<string> *                           key_list;
@@ -157,7 +157,6 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <rel_attr>            rel_attr
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
-%type <value_list>          value_list
 %type <expression>          where
 %type <cstring>             storage_format
 %type <key_list>            primary_key
@@ -200,7 +199,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 
 %left '+' '-'
 %left '*' '/'
-%left AND
+%left AND OR
 %right UMINUS
 %%
 
@@ -430,35 +429,23 @@ attr_list:
     ;
 
 insert_stmt:        /*insert   语句的语法解析树*/
-    INSERT INTO ID VALUES LBRACE value value_list RBRACE 
+    INSERT INTO ID VALUES LBRACE expression_list RBRACE 
     {
       $$ = new ParsedSqlNode(SCF_INSERT);
       $$->insertion.relation_name = $3;
-      if ($7 != nullptr) {
-        $$->insertion.values.swap(*$7);
-        delete $7;
+      if ($6 != nullptr) {
+        for (const std::unique_ptr<Expression>& expr: *$6) {
+          Value val;
+          if (OB_FAIL(expr->try_get_value(val))) {
+            YYERROR;
+          }
+          $$->insertion.values.push_back(val);
+        }
+        delete $6;
       }
-      $$->insertion.values.emplace_back(*$6);
-      reverse($$->insertion.values.begin(), $$->insertion.values.end());
-      delete $6;
     }
     ;
 
-value_list:
-    /* empty */
-    {
-      $$ = nullptr;
-    }
-    | COMMA value value_list  { 
-      if ($3 != nullptr) {
-        $$ = $3;
-      } else {
-        $$ = new vector<Value>;
-      }
-      $$->emplace_back(*$2);
-      delete $2;
-    }
-    ;
 value:
     NUMBER {
       $$ = new Value((int)$1);
@@ -592,9 +579,15 @@ expression_list:
     ;
 
 expression:
-    boolean_primary 
+    boolean_primary {
+      $$ = $1;
+    }
     | expression AND expression {
       $$ = new ConjunctionExpr(ConjunctionExpr::Type::AND, $1, $3);
+      $$->set_name(token_name(sql_string, &@$));
+    }
+    | expression OR expression {
+      $$ = new ConjunctionExpr(ConjunctionExpr::Type::OR, $1, $3);
       $$->set_name(token_name(sql_string, &@$));
     }
     ;
@@ -604,11 +597,15 @@ boolean_primary:
       $$ = new ComparisonExpr($2, $1, $3);
       $$->set_name(token_name(sql_string, &@$));
     }
-    | predicate
+    | predicate {
+      $$ = $1;
+    }
     ;
 
 predicate:
-    bit_expr
+    bit_expr {
+      $$ = $1;
+    }
     // | bit_expr LIKE simple_expr {
     // }
     // | bit_expr IN expression_list {
@@ -631,7 +628,9 @@ bit_expr:
     | bit_expr '/' bit_expr {
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::DIV, $1, $3, sql_string, &@$);
     }
-    | simple_expr
+    | simple_expr {
+      $$ = $1;
+    }
     ;
 
 simple_expr:
@@ -657,8 +656,7 @@ simple_expr:
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::NEGATIVE, $2, nullptr, sql_string, &@$);
     }
     | aggre_name LBRACE expression RBRACE {
-      $$ = new UnboundAggregateExpr($1, $3);
-      $$->set_name(token_name(sql_string, &@$));
+      $$ = create_aggregate_expression($1, $3, sql_string, &@$);
     }
     ;
 
