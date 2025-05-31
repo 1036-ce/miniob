@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include "common/lang/queue.h"
 #include "common/lang/string.h"
 #include "common/lang/memory.h"
 #include "common/lang/unordered_set.h"
@@ -128,6 +129,11 @@ public:
    */
   virtual RC eval(Chunk &chunk, vector<uint8_t> &select) { return RC::UNIMPLEMENTED; }
 
+  /**
+   * @brief 收集表达式相关的表
+   */
+  virtual RC related_tables(std::vector<const Table *> &tables) const { return RC::UNSUPPORTED; }
+
 protected:
   /**
    * @brief 表达式在下层算子返回的 chunk 中的位置
@@ -217,6 +223,8 @@ public:
 
   RC get_value(const Tuple &tuple, Value &value) const override;
 
+  RC related_tables(vector<const Table *> &tables) const override;
+
 private:
   Field field_;
 };
@@ -252,6 +260,8 @@ public:
   void         get_value(Value &value) const { value = value_; }
   const Value &get_value() const { return value_; }
 
+  RC related_tables(vector<const Table *> &tables) const override { return RC::SUCCESS; }
+
 private:
   Value value_;
 };
@@ -278,6 +288,8 @@ public:
 
   unique_ptr<Expression> &child() { return child_; }
 
+  RC related_tables(vector<const Table *> &tables) const override { return RC::SUCCESS; }
+
 private:
   RC cast(const Value &value, Value &cast_value) const;
 
@@ -293,6 +305,7 @@ private:
 class ComparisonExpr : public Expression
 {
 public:
+  ComparisonExpr(CompOp comp, Expression *left, Expression *right);
   ComparisonExpr(CompOp comp, unique_ptr<Expression> left, unique_ptr<Expression> right);
   virtual ~ComparisonExpr();
 
@@ -330,6 +343,8 @@ public:
   template <typename T>
   RC compare_column(const Column &left, const Column &right, vector<uint8_t> &result) const;
 
+  RC related_tables(vector<const Table *> &tables) const override;
+
 private:
   CompOp                 comp_;
   unique_ptr<Expression> left_;
@@ -352,29 +367,41 @@ public:
   };
 
 public:
+  ConjunctionExpr(Type type, Expression *left, Expression *right);
+  ConjunctionExpr(Type type, unique_ptr<Expression> left, unique_ptr<Expression> right);
   ConjunctionExpr(Type type, vector<unique_ptr<Expression>> &children);
   virtual ~ConjunctionExpr() = default;
 
   unique_ptr<Expression> copy() const override
   {
-    vector<unique_ptr<Expression>> children;
-    for (auto &child : children_) {
-      children.emplace_back(child->copy());
-    }
-    return make_unique<ConjunctionExpr>(conjunction_type_, children);
+    return make_unique<ConjunctionExpr>(conjunction_type_, left_->copy(), right_->copy());
   }
 
   ExprType type() const override { return ExprType::CONJUNCTION; }
   AttrType value_type() const override { return AttrType::BOOLEANS; }
   RC       get_value(const Tuple &tuple, Value &value) const override;
+  RC       try_get_value(Value &value) const override;
+
+  RC related_tables(vector<const Table *> &tables) const override;
 
   Type conjunction_type() const { return conjunction_type_; }
 
+  unique_ptr<Expression> &left() { return left_; }
+  unique_ptr<Expression> &right() { return right_; }
+
   vector<unique_ptr<Expression>> &children() { return children_; }
+
+  auto flatten() -> vector<unique_ptr<Expression> *>;
+
+  auto extract(const vector<const Table *> &target_tables) -> unique_ptr<Expression>;
+
+  auto simplify() -> unique_ptr<Expression>;
 
 private:
   Type                           conjunction_type_;
   vector<unique_ptr<Expression>> children_;
+  unique_ptr<Expression>         left_;
+  unique_ptr<Expression>         right_;
 };
 
 /**
@@ -424,6 +451,8 @@ public:
   RC get_column(Chunk &chunk, Column &column) override;
 
   RC try_get_value(Value &value) const override;
+
+  RC related_tables(vector<const Table *> &tables) const override;
 
   Type arithmetic_type() const { return arithmetic_type_; }
 
@@ -507,6 +536,8 @@ public:
   const unique_ptr<Expression> &child() const { return child_; }
 
   unique_ptr<Aggregator> create_aggregator() const;
+
+  RC related_tables(vector<const Table *> &tables) const override { return child_->related_tables(tables); }
 
 public:
   static RC type_from_string(const char *type_str, Type &type);

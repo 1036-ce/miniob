@@ -39,7 +39,8 @@ RC TableScanVecPhysicalOperator::next(Chunk &chunk)
   filterd_columns_.reset_data();
   if (OB_SUCC(rc = chunk_scanner_.next_chunk(all_columns_))) {
     select_.assign(all_columns_.rows(), 1);
-    if (predicates_.empty()) {
+    // if (predicates_.empty()) {
+    if (predicate_ == nullptr) {
       chunk.reference(all_columns_);
     } else {
       rc = filter(all_columns_);
@@ -67,19 +68,14 @@ RC TableScanVecPhysicalOperator::close() { return chunk_scanner_.close_scan(); }
 
 string TableScanVecPhysicalOperator::param() const { return table_->name(); }
 
-void TableScanVecPhysicalOperator::set_predicates(vector<unique_ptr<Expression>> &&exprs)
-{
-  predicates_ = std::move(exprs);
-}
+void TableScanVecPhysicalOperator::set_predicate(unique_ptr<Expression> &&exprs) { predicate_ = std::move(exprs); }
 
 RC TableScanVecPhysicalOperator::filter(Chunk &chunk)
 {
   RC rc = RC::SUCCESS;
-  for (unique_ptr<Expression> &expr : predicates_) {
-    rc = expr->eval(chunk, select_);
-    if (rc != RC::SUCCESS) {
-      return rc;
-    }
+  rc = predicate_->eval(chunk, select_);
+  if (rc != RC::SUCCESS) {
+    return rc;
   }
   return rc;
 }

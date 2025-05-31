@@ -40,7 +40,7 @@ public:
 
   Tuple *current_tuple() override;
 
-  void set_predicates(vector<unique_ptr<Expression>> &&exprs);
+  void set_predicate(unique_ptr<Expression> &&exprs);
 
 private:
   // 与TableScanPhysicalOperator代码相同，可以优化
@@ -61,5 +61,5 @@ private:
   bool  left_inclusive_  = false;
   bool  right_inclusive_ = false;
 
-  vector<unique_ptr<Expression>> predicates_;
+  unique_ptr<Expression> predicate_;
 };

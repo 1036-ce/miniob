@@ -54,8 +54,8 @@ public:
   Table        *table() const { return table_; }
   ReadWriteMode read_write_mode() const { return mode_; }
 
-  void set_predicates(vector<unique_ptr<Expression>> &&exprs);
-  auto predicates() -> vector<unique_ptr<Expression>> & { return predicates_; }
+  void set_predicate(unique_ptr<Expression> &&exprs);
+  auto predicate() -> unique_ptr<Expression> & { return predicate_; }
 
 private:
   Table        *table_ = nullptr;
@@ -65,5 +65,5 @@ private:
   // 这里的表达式都是比较简单的比较运算，并且左右两边都是取字段表达式或值表达式
   // 不包含复杂的表达式运算，比如加减乘除、或者conjunction expression
   // 如果有多个表达式，他们的关系都是 AND
-  vector<unique_ptr<Expression>> predicates_;
+  unique_ptr<Expression> predicate_;
 };

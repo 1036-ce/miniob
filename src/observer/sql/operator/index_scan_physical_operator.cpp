@@ -109,26 +109,29 @@ Tuple *IndexScanPhysicalOperator::current_tuple()
   return &tuple_;
 }
 
-void IndexScanPhysicalOperator::set_predicates(vector<unique_ptr<Expression>> &&exprs)
+void IndexScanPhysicalOperator::set_predicate(unique_ptr<Expression> &&exprs)
 {
-  predicates_ = std::move(exprs);
+  predicate_ = std::move(exprs);
 }
 
 RC IndexScanPhysicalOperator::filter(RowTuple &tuple, bool &result)
 {
+  if (!predicate_) {
+    result = true;
+    return RC::SUCCESS;
+  }
+
   RC    rc = RC::SUCCESS;
   Value value;
-  for (unique_ptr<Expression> &expr : predicates_) {
-    rc = expr->get_value(tuple, value);
-    if (rc != RC::SUCCESS) {
-      return rc;
-    }
 
-    bool tmp_result = value.get_boolean();
-    if (!tmp_result) {
-      result = false;
-      return rc;
-    }
+  rc = predicate_->get_value(tuple, value);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+  bool tmp_result = value.get_boolean();
+  if (!tmp_result) {
+    result = false;
+    return rc;
   }
 
   result = true;

@@ -67,7 +67,8 @@ public:
 
   int table_id() const { return table_->table_id(); }
 
-  void set_predicates(vector<unique_ptr<Expression>> &&exprs);
+  // void set_predicates(vector<unique_ptr<Expression>> &&exprs);
+  void set_predicate(unique_ptr<Expression> &&exprs);
 
 private:
   RC filter(RowTuple &tuple, bool &result);
@@ -79,5 +80,6 @@ private:
   RecordScanner                 *record_scanner_;
   Record                         current_record_;
   RowTuple                       tuple_;
-  vector<unique_ptr<Expression>> predicates_;  // TODO chang predicate to table tuple filter
+  // vector<unique_ptr<Expression>> predicates_;  // TODO chang predicate to table tuple filter
+  unique_ptr<Expression>         predicate_;  // TODO chang predicate to table tuple filter
 };

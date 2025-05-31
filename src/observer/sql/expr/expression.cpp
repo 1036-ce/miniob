@@ -23,6 +23,18 @@ RC FieldExpr::get_value(const Tuple &tuple, Value &value) const
   return tuple.find_cell(TupleCellSpec(table_name(), field_name()), value);
 }
 
+RC FieldExpr::related_tables(vector<const Table *> &tables) const
+{
+  const Table *cur_table = field_.table();
+  for (auto table : tables) {
+    if (table == cur_table) {
+      return RC::SUCCESS;
+    }
+  }
+  tables.push_back(cur_table);
+  return RC::SUCCESS;
+}
+
 bool FieldExpr::equal(const Expression &other) const
 {
   if (this == &other) {
@@ -91,7 +103,7 @@ RC CastExpr::cast(const Value &value, Value &cast_value) const
 RC CastExpr::get_value(const Tuple &tuple, Value &result) const
 {
   Value value;
-  RC rc = child_->get_value(tuple, value);
+  RC    rc = child_->get_value(tuple, value);
   if (rc != RC::SUCCESS) {
     return rc;
   }
@@ -102,7 +114,7 @@ RC CastExpr::get_value(const Tuple &tuple, Value &result) const
 RC CastExpr::try_get_value(Value &result) const
 {
   Value value;
-  RC rc = child_->try_get_value(value);
+  RC    rc = child_->try_get_value(value);
   if (rc != RC::SUCCESS) {
     return rc;
   }
@@ -112,16 +124,18 @@ RC CastExpr::try_get_value(Value &result) const
 
 ////////////////////////////////////////////////////////////////////////////////
 
+ComparisonExpr::ComparisonExpr(CompOp comp, Expression *left, Expression *right)
+    : comp_(comp), left_(left), right_(right)
+{}
 ComparisonExpr::ComparisonExpr(CompOp comp, unique_ptr<Expression> left, unique_ptr<Expression> right)
     : comp_(comp), left_(std::move(left)), right_(std::move(right))
-{
-}
+{}
 
 ComparisonExpr::~ComparisonExpr() {}
 
 RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &result) const
 {
-  RC  rc         = RC::SUCCESS;
+  RC rc = RC::SUCCESS;
   if (comp_ == CompOp::IS) {
     result = left.is_null();
     return rc;
@@ -168,8 +182,8 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
 RC ComparisonExpr::try_get_value(Value &cell) const
 {
   if (left_->type() == ExprType::VALUE && right_->type() == ExprType::VALUE) {
-    ValueExpr *  left_value_expr  = static_cast<ValueExpr *>(left_.get());
-    ValueExpr *  right_value_expr = static_cast<ValueExpr *>(right_.get());
+    ValueExpr   *left_value_expr  = static_cast<ValueExpr *>(left_.get());
+    ValueExpr   *right_value_expr = static_cast<ValueExpr *>(right_.get());
     const Value &left_cell        = left_value_expr->get_value();
     const Value &right_cell       = right_value_expr->get_value();
 
@@ -262,36 +276,185 @@ RC ComparisonExpr::compare_column(const Column &left, const Column &right, vecto
   return rc;
 }
 
+RC ComparisonExpr::related_tables(vector<const Table *> &tables) const
+{
+  RC rc = RC::SUCCESS;
+  if (OB_FAIL(rc = left_->related_tables(tables))) {
+    return rc;
+  }
+  return right_->related_tables(tables);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
+ConjunctionExpr::ConjunctionExpr(Type type, Expression *left, Expression *right)
+    : conjunction_type_(type), left_(left), right_(right)
+{}
+
+ConjunctionExpr::ConjunctionExpr(Type type, unique_ptr<Expression> left, unique_ptr<Expression> right)
+    : conjunction_type_(type), left_(std::move(left)), right_(std::move(right))
+{}
+
 ConjunctionExpr::ConjunctionExpr(Type type, vector<unique_ptr<Expression>> &children)
     : conjunction_type_(type), children_(std::move(children))
 {}
 
 RC ConjunctionExpr::get_value(const Tuple &tuple, Value &value) const
 {
-  RC rc = RC::SUCCESS;
-  if (children_.empty()) {
-    value.set_boolean(true);
+  RC    rc = RC::SUCCESS;
+  Value val;
+  if (OB_FAIL(rc = left_->get_value(tuple, val))) {
     return rc;
   }
 
-  Value tmp_value;
-  for (const unique_ptr<Expression> &expr : children_) {
-    rc = expr->get_value(tuple, tmp_value);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to get value by child expression. rc=%s", strrc(rc));
-      return rc;
-    }
-    bool bool_value = tmp_value.get_boolean();
-    if ((conjunction_type_ == Type::AND && !bool_value) || (conjunction_type_ == Type::OR && bool_value)) {
-      value.set_boolean(bool_value);
-      return rc;
-    }
+  if (conjunction_type_ == Type::AND && val.get_boolean() == false) {
+    value.set_boolean(false);
+    return RC::SUCCESS;
+  }
+  if (conjunction_type_ == Type::OR && val.get_boolean() == true) {
+    value.set_boolean(true);
+    return RC::SUCCESS;
   }
 
-  bool default_value = (conjunction_type_ == Type::AND);
-  value.set_boolean(default_value);
-  return rc;
+  if (OB_FAIL(rc = right_->get_value(tuple, val))) {
+    return rc;
+  }
+
+  value.set_boolean(val.get_boolean());
+  return RC::SUCCESS;
+}
+
+RC ConjunctionExpr::try_get_value(Value &value) const {
+  RC rc = RC::SUCCESS;
+  Value val;
+
+  if (OB_FAIL(rc = left_->try_get_value(val))) {
+    return rc;
+  }
+
+  if (conjunction_type_ == Type::AND && val.get_boolean() == false) {
+    value.set_boolean(false);
+    return RC::SUCCESS;
+  }
+  if (conjunction_type_ == Type::OR && val.get_boolean() == true) {
+    value.set_boolean(true);
+    return RC::SUCCESS;
+  }
+
+  if (OB_FAIL(rc = right_->try_get_value(val))) {
+    return rc;
+  }
+
+  value.set_boolean(val.get_boolean());
+  return RC::SUCCESS;
+}
+
+RC ConjunctionExpr::related_tables(vector<const Table *> &tables) const
+{
+  RC rc = RC::SUCCESS;
+  if (OB_FAIL(rc = left_->related_tables(tables))) {
+    return rc;
+  }
+  return right_->related_tables(tables);
+}
+
+auto ConjunctionExpr::flatten() -> vector<unique_ptr<Expression> *>
+{
+  vector<unique_ptr<Expression> *> ret;
+
+  queue<unique_ptr<Expression> *> que;
+  que.push(&left_);
+  que.push(&right_);
+
+  while (!que.empty()) {
+    auto expr = que.front();
+    que.pop();
+
+    if ((*expr)->type() == ExprType::COMPARISON) {
+      ret.push_back(expr);
+    } else if ((*expr)->type() == ExprType::CONJUNCTION) {
+      auto                    conjunction_expr = static_cast<ConjunctionExpr *>((*expr).get());
+      unique_ptr<Expression> *left             = &conjunction_expr->left_;
+      unique_ptr<Expression> *right            = &conjunction_expr->right_;
+      que.push(left);
+      que.push(right);
+    } else {
+      continue;
+    }
+  }
+  return ret;
+}
+
+auto ConjunctionExpr::extract(const vector<const Table *> &target_tables) -> unique_ptr<Expression>
+{
+
+  auto equal = [](const vector<const Table *> &lhs, const vector<const Table *> &rhs) -> bool {
+    if (lhs.size() != rhs.size()) {
+      return false;
+    }
+
+    for (auto table : lhs) {
+      if (std::find(rhs.begin(), rhs.end(), table) == rhs.end()) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  auto ret              = this->copy();
+  auto conjunction_expr = static_cast<ConjunctionExpr *>(ret.get());
+
+  vector<unique_ptr<Expression> *> exprs = conjunction_expr->flatten();
+  vector<const Table *>            tables;
+
+  for (auto expr : exprs) {
+    if ((*expr)->type() == ExprType::COMPARISON) {
+      auto comp_expr = static_cast<ComparisonExpr *>(expr->get());
+
+      tables.clear();
+      comp_expr->related_tables(tables);
+
+      if (!equal(target_tables, tables)) {
+        *expr = make_unique<ValueExpr>(Value(true));
+      }
+    }
+  }
+  return conjunction_expr->simplify();
+}
+
+auto ConjunctionExpr::simplify() -> unique_ptr<Expression>
+{
+  unique_ptr<Expression> left, right;
+  Value                  val;
+
+  if (left_->type() == ExprType::CONJUNCTION) {
+    auto conjunction_expr = static_cast<ConjunctionExpr *>(left_.get());
+    left.reset(conjunction_expr->simplify().release());
+  }
+
+  if (right_->type() == ExprType::CONJUNCTION) {
+    auto conjunction_expr = static_cast<ConjunctionExpr *>(right_.get());
+    right.reset(conjunction_expr->simplify().release());
+  }
+
+  if (OB_FAIL(left->try_get_value(val)) && OB_FAIL(right->try_get_value(val))) {
+    return make_unique<ConjunctionExpr>(conjunction_type_, std::move(left), std::move(right));
+  }
+
+  auto func = [this](Value val, unique_ptr<Expression> &other) -> unique_ptr<Expression> {
+    if (conjunction_type_ == Type::AND) {
+      return true == val.get_boolean() ? std::move(other) : make_unique<ValueExpr>(Value(false));
+    } else {
+      return false == val.get_boolean() ? std::move(other) : make_unique<ValueExpr>(Value(true));
+    }
+  };
+
+  if (OB_SUCC(left->try_get_value(val))) {
+    return func(val, right);
+  }
+  if (OB_SUCC(right->try_get_value(val))) {
+    return func(val, left);
+  }
+  return nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -524,6 +687,14 @@ RC ArithmeticExpr::try_get_value(Value &value) const
   return calc_value(left_value, right_value, value);
 }
 
+RC ArithmeticExpr::related_tables(vector<const Table *> &tables) const
+{
+  RC rc = RC::SUCCESS;
+  if (OB_FAIL(rc = left_->related_tables(tables))) {
+    return rc;
+  }
+  return right_->related_tables(tables);
+}
 ////////////////////////////////////////////////////////////////////////////////
 
 UnboundAggregateExpr::UnboundAggregateExpr(const char *aggregate_name, Expression *child)

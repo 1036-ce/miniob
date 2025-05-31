@@ -31,6 +31,7 @@ public:
   RC rewrite(unique_ptr<LogicalOperator> &oper, bool &change_made) override;
 
 private:
-  RC   get_exprs_can_pushdown(unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &pushdown_exprs);
+  RC   get_exprs_can_pushdown(unique_ptr<Expression> &expr, unique_ptr<Expression> &pushdown_expr);
+  // RC   get_exprs_can_pushdown(unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &pushdown_exprs);
   bool is_empty_predicate(unique_ptr<Expression> &expr);
 };

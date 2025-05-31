@@ -23,7 +23,7 @@ See the Mulan PSL v2 for more details. */
  *     : table_(table), values_(values), value_amount_(value_amount)
  * {} */
 
-RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
+RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
 {
   const char *table_name = update.relation_name.c_str();
   if (nullptr == db || nullptr == table_name) {
@@ -77,12 +77,7 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
   FilterStmt *filter_stmt = nullptr;
   unordered_map<string, Table *> table_map;
   table_map.insert({table_meta.name(), table});
-  RC          rc          = FilterStmt::create(db,
-      table,
-      &table_map,
-      update.conditions.data(),
-      static_cast<int>(update.conditions.size()),
-      filter_stmt);
+  RC rc = FilterStmt::create(db, table, &table_map, std::move(update.condition), filter_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");
     return rc;

@@ -77,21 +77,16 @@ class FilterStmt
 {
 public:
   FilterStmt() = default;
+  FilterStmt(unique_ptr<Expression> predicate): predicate_(std::move(predicate)) {}
   virtual ~FilterStmt();
 
 public:
-  const vector<FilterUnit *> &filter_units() const { return filter_units_; }
-
-public:
-  static RC create(Db *db, Table *default_table, unordered_map<string, Table *> *tables,
-      const ConditionSqlNode *conditions, int condition_num, FilterStmt *&stmt);
-
-  static RC create_filter_unit(Db *db, Table *default_table, unordered_map<string, Table *> *tables,
-      const ConditionSqlNode &condition, FilterUnit *&filter_unit);
+  static RC create(Db *db, Table *default_table, unordered_map<string, Table *> *tables, unique_ptr<Expression> predicate, FilterStmt *&stmt);
+  auto predicate() -> unique_ptr<Expression> & { return predicate_; }
 
 private:
   // 检查比较是否合法
   static RC check(const FilterUnit& filter_unit);
 
-  vector<FilterUnit *> filter_units_;  // 默认当前都是AND关系
+  unique_ptr<Expression> predicate_;
 };

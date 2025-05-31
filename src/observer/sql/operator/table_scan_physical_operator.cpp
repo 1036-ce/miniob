@@ -75,26 +75,29 @@ Tuple *TableScanPhysicalOperator::current_tuple()
 
 string TableScanPhysicalOperator::param() const { return table_->name(); }
 
-void TableScanPhysicalOperator::set_predicates(vector<unique_ptr<Expression>> &&exprs)
+void TableScanPhysicalOperator::set_predicate(unique_ptr<Expression> &&exprs)
 {
-  predicates_ = std::move(exprs);
+  predicate_ = std::move(exprs);
 }
 
 RC TableScanPhysicalOperator::filter(RowTuple &tuple, bool &result)
 {
+  if (!predicate_) {
+    result = true;
+    return RC::SUCCESS;
+  }
+
   RC    rc = RC::SUCCESS;
   Value value;
-  for (unique_ptr<Expression> &expr : predicates_) {
-    rc = expr->get_value(tuple, value);
-    if (rc != RC::SUCCESS) {
-      return rc;
-    }
 
-    bool tmp_result = value.get_boolean();
-    if (!tmp_result) {
-      result = false;
-      return rc;
-    }
+  rc = predicate_->get_value(tuple, value);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+  bool tmp_result = value.get_boolean();
+  if (!tmp_result) {
+    result = false;
+    return rc;
   }
 
   result = true;

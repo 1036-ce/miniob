@@ -289,29 +289,41 @@ RC ExpressionBinder::bind_conjunction_expression(
   auto conjunction_expr = static_cast<ConjunctionExpr *>(expr.get());
 
   vector<unique_ptr<Expression>>  child_bound_expressions;
-  vector<unique_ptr<Expression>> &children = conjunction_expr->children();
+  unique_ptr<Expression>        &left_expr  = conjunction_expr->left();
+  unique_ptr<Expression>        &right_expr = conjunction_expr->right();
 
-  for (unique_ptr<Expression> &child_expr : children) {
-    child_bound_expressions.clear();
+  RC rc = bind_expression(left_expr, child_bound_expressions);
+  if (OB_FAIL(rc)) {
+    return rc;
+  }
 
-    RC rc = bind_expression(child_expr, child_bound_expressions);
-    if (rc != RC::SUCCESS) {
-      return rc;
-    }
+  if (child_bound_expressions.size() != 1) {
+    LOG_WARN("invalid left children number of comparison expression: %d", child_bound_expressions.size());
+    return RC::INVALID_ARGUMENT;
+  }
 
-    if (child_bound_expressions.size() != 1) {
-      LOG_WARN("invalid children number of conjunction expression: %d", child_bound_expressions.size());
-      return RC::INVALID_ARGUMENT;
-    }
+  unique_ptr<Expression> &left = child_bound_expressions[0];
+  if (left.get() != left_expr.get()) {
+    left_expr.reset(left.release());
+  }
 
-    unique_ptr<Expression> &child = child_bound_expressions[0];
-    if (child.get() != child_expr.get()) {
-      child_expr.reset(child.release());
-    }
+  child_bound_expressions.clear();
+  rc = bind_expression(right_expr, child_bound_expressions);
+  if (OB_FAIL(rc)) {
+    return rc;
+  }
+
+  if (child_bound_expressions.size() != 1) {
+    LOG_WARN("invalid right children number of comparison expression: %d", child_bound_expressions.size());
+    return RC::INVALID_ARGUMENT;
+  }
+
+  unique_ptr<Expression> &right = child_bound_expressions[0];
+  if (right.get() != right_expr.get()) {
+    right_expr.reset(right.release());
   }
 
   bound_expressions.emplace_back(std::move(expr));
-
   return RC::SUCCESS;
 }
 

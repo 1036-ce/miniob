@@ -61,7 +61,7 @@ extern double atof();
 %option bison-locations
 
 WHITE_SPACE      [\ \t\b\f]
-DIGIT            [0-9]+
+DIGIT            [-]?[0-9]+
 
 ID               [A-Za-z_]+[A-Za-z0-9_]*
 DOT              \.

@@ -36,17 +36,17 @@ public:
   RC next(Chunk &chunk) override;
   RC close() override;
 
-  void set_predicates(vector<unique_ptr<Expression>> &&exprs);
+  void set_predicate(unique_ptr<Expression> &&exprs);
 
 private:
   RC filter(Chunk &chunk);
 
 private:
-  Table                         *table_ = nullptr;
-  ReadWriteMode                  mode_  = ReadWriteMode::READ_WRITE;
-  ChunkFileScanner               chunk_scanner_;
-  Chunk                          all_columns_;
-  Chunk                          filterd_columns_;
-  vector<uint8_t>                select_;
-  vector<unique_ptr<Expression>> predicates_;
+  Table                 *table_ = nullptr;
+  ReadWriteMode          mode_  = ReadWriteMode::READ_WRITE;
+  ChunkFileScanner       chunk_scanner_;
+  Chunk                  all_columns_;
+  Chunk                  filterd_columns_;
+  vector<uint8_t>        select_;
+  unique_ptr<Expression> predicate_;
 };

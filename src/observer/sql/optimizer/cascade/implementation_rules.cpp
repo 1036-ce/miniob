@@ -41,15 +41,12 @@ void LogicalGetToPhysicalSeqScan::transform(OperatorNode* input,
                          OptimizerContext *context) const {
   TableGetLogicalOperator* table_get_oper = dynamic_cast<TableGetLogicalOperator*>(input);
 
-  vector<unique_ptr<Expression>> &log_preds = table_get_oper->predicates();
-  vector<unique_ptr<Expression>> phys_preds;
-  for (auto &pred : log_preds) {
-    phys_preds.push_back(pred->copy());
-  }
+  unique_ptr<Expression> &log_pred = table_get_oper->predicate();
+  unique_ptr<Expression> phys_pred(log_pred->copy());
 
   Table *table = table_get_oper->table();
   auto table_scan_oper = new TableScanPhysicalOperator(table, table_get_oper->read_write_mode());
-  table_scan_oper->set_predicates(std::move(phys_preds));
+  table_scan_oper->set_predicate(std::move(phys_pred));
   auto oper = unique_ptr<OperatorNode>(table_scan_oper);
 
   transformed->emplace_back(std::move(oper));

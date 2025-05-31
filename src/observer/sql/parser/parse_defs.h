@@ -92,8 +92,9 @@ struct SelectSqlNode
 {
   vector<unique_ptr<Expression>> expressions;  ///< 查询的表达式
   vector<string>                 relations;    ///< 查询的表
-  vector<ConditionSqlNode>       conditions;   ///< 查询条件，使用AND串联起来多个条件
+  // vector<ConditionSqlNode>       conditions;   ///< 查询条件，使用AND串联起来多个条件
   vector<unique_ptr<Expression>> group_by;     ///< group by clause
+  unique_ptr<Expression>         condition;
 };
 
 /**
@@ -123,7 +124,8 @@ struct InsertSqlNode
 struct DeleteSqlNode
 {
   string                   relation_name;  ///< Relation to delete from
-  vector<ConditionSqlNode> conditions;
+  // vector<ConditionSqlNode> conditions;
+  unique_ptr<Expression>   condition;
 };
 
 /**
@@ -144,7 +146,8 @@ struct UpdateSqlNode
 {
   string                              relation_name;    ///< Relation to update
   std::vector<unique_ptr<Assignment>> assignment_list;  ///< 更新的列表
-  vector<ConditionSqlNode>            conditions;       ///< 更新的条件
+  // vector<ConditionSqlNode>            conditions;       ///< 更新的条件
+  unique_ptr<Expression>              condition;
   /* string                   attribute_name;  ///< 更新的字段，仅支持一个字段
    * Value                    value;           ///< 更新的值，仅支持一个字段 */
 };

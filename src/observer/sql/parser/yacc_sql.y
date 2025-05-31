@@ -122,7 +122,6 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
   ParsedSqlNode *                            sql_node;
-  ConditionSqlNode *                         condition;
   Value *                                    value;
   enum CompOp                                comp;
   RelAttrSqlNode *                           rel_attr;
@@ -131,7 +130,6 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   Expression *                               expression;
   vector<unique_ptr<Expression>> *           expression_list;
   vector<Value> *                            value_list;
-  vector<ConditionSqlNode> *                 condition_list;
   vector<RelAttrSqlNode> *                   rel_attr_list;
   vector<string> *                           relation_list;
   vector<string> *                           key_list;
@@ -152,7 +150,6 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 /** type 定义了各种解析后的结果输出的是什么类型。类型对应了 union 中的定义的成员变量名称 **/
 %type <boolean>             null_opt;
 %type <number>              type
-%type <condition>           condition
 %type <value>               value
 %type <number>              number
 %type <cstring>             relation
@@ -161,8 +158,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
 %type <value_list>          value_list
-%type <condition_list>      where
-%type <condition_list>      condition_list
+%type <expression>          where
 %type <cstring>             storage_format
 %type <key_list>            primary_key
 %type <key_list>            attr_list
@@ -204,6 +200,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 
 %left '+' '-'
 %left '*' '/'
+%left AND
 %right UMINUS
 %%
 
@@ -499,8 +496,7 @@ delete_stmt:    /*  delete 语句的语法解析树*/
       $$ = new ParsedSqlNode(SCF_DELETE);
       $$->deletion.relation_name = $3;
       if ($4 != nullptr) {
-        $$->deletion.conditions.swap(*$4);
-        delete $4;
+        $$->deletion.condition.reset($4);
       }
     }
     ;
@@ -532,17 +528,6 @@ assignment_list:
 
 
 update_stmt:      /*  update 语句的语法解析树*/
-    // UPDATE relation SET ID EQ value where 
-    // {
-    //   $$ = new ParsedSqlNode(SCF_UPDATE);
-    //   $$->update.relation_name = $2;
-    //   $$->update.attribute_name = $4;
-    //   $$->update.value = *$6;
-    //   if ($7 != nullptr) {
-    //     $$->update.conditions.swap(*$7);
-    //     delete $7;
-    //   }
-    // }
     UPDATE relation SET assignment_list where 
     {
       $$ = new ParsedSqlNode(SCF_UPDATE);
@@ -552,8 +537,7 @@ update_stmt:      /*  update 语句的语法解析树*/
         delete $4;
       }
       if ($5 != nullptr) {
-        $$->update.conditions.swap(*$5);
-        delete $5;
+        $$->update.condition.reset($5);
       }
     }
     ;
@@ -572,8 +556,7 @@ select_stmt:        /*  select 语句的语法解析树*/
       }
 
       if ($5 != nullptr) {
-        $$->selection.conditions.swap(*$5);
-        delete $5;
+        $$->selection.condition.reset($5);
       }
 
       if ($6 != nullptr) {
@@ -607,9 +590,12 @@ expression_list:
       $$->emplace($$->begin(), $1);
     }
     ;
+
 expression:
-    boolean_primary {
-      $$ = $1;
+    boolean_primary 
+    | expression AND expression {
+      $$ = new ConjunctionExpr(ConjunctionExpr::Type::AND, $1, $3);
+      $$->set_name(token_name(sql_string, &@$));
     }
     ;
 
@@ -618,14 +604,11 @@ boolean_primary:
       $$ = new ComparisonExpr($2, $1, $3);
       $$->set_name(token_name(sql_string, &@$));
     }
-    | predicate {
-      $$ = $1;
-    }
+    | predicate
+    ;
 
 predicate:
-    bit_expr {
-      $$ = $1;
-    }
+    bit_expr
     // | bit_expr LIKE simple_expr {
     // }
     // | bit_expr IN expression_list {
@@ -648,9 +631,7 @@ bit_expr:
     | bit_expr '/' bit_expr {
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::DIV, $1, $3, sql_string, &@$);
     }
-    | simple_expr {
-      $$ = $1;
-    }
+    | simple_expr
     ;
 
 simple_expr:
@@ -682,9 +663,7 @@ simple_expr:
     ;
 
 aggre_name:
-    ID {
-      $$ = $1;
-    }
+    ID
     ;
 
 rel_attr:
@@ -725,74 +704,8 @@ where:
     {
       $$ = nullptr;
     }
-    | WHERE condition_list {
+    | WHERE expression {
       $$ = $2;  
-    }
-    ;
-condition_list:
-    /* empty */
-    {
-      $$ = nullptr;
-    }
-    | condition {
-      $$ = new vector<ConditionSqlNode>;
-      $$->emplace_back(*$1);
-      delete $1;
-    }
-    | condition AND condition_list {
-      $$ = $3;
-      $$->emplace_back(*$1);
-      delete $1;
-    }
-    ;
-condition:
-    rel_attr comp_op value
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_is_attr = 1;
-      $$->left_attr = *$1;
-      $$->right_is_attr = 0;
-      $$->right_value = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
-    }
-    | value comp_op value 
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_is_attr = 0;
-      $$->left_value = *$1;
-      $$->right_is_attr = 0;
-      $$->right_value = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
-    }
-    | rel_attr comp_op rel_attr
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_is_attr = 1;
-      $$->left_attr = *$1;
-      $$->right_is_attr = 1;
-      $$->right_attr = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
-    }
-    | value comp_op rel_attr
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_is_attr = 0;
-      $$->left_value = *$1;
-      $$->right_is_attr = 1;
-      $$->right_attr = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
     }
     ;
 

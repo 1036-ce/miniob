@@ -129,15 +129,31 @@ RC PhysicalPlanGenerator::create_vec(
 RC PhysicalPlanGenerator::create_plan(
     TableGetLogicalOperator &table_get_oper, unique_ptr<PhysicalOperator> &oper, Session *session)
 {
-  vector<unique_ptr<Expression>> &predicates = table_get_oper.predicates();
+  unique_ptr<Expression> &predicate = table_get_oper.predicate();
+  vector<unique_ptr<Expression> *> exprs;
+
+  if (predicate) {
+    if (predicate->type() == ExprType::CONJUNCTION) {
+      ConjunctionExpr *conjunction_expr = static_cast<ConjunctionExpr *>(predicate.get());
+      exprs = conjunction_expr->flatten();
+    }
+    else if (predicate->type() == ExprType::COMPARISON) {
+      exprs.push_back(&predicate);
+    }
+    else {
+      LOG_WARN("Predicate must be COMPARISON or CONJUNCTION");
+      return RC::UNSUPPORTED;
+    }
+  }
+
   // 看看是否有可以用于索引查找的表达式
   Table *table = table_get_oper.table();
-
   Index     *index      = nullptr;
   ValueExpr *value_expr = nullptr;
-  for (auto &expr : predicates) {
-    if (expr->type() == ExprType::COMPARISON) {
-      auto comparison_expr = static_cast<ComparisonExpr *>(expr.get());
+
+  for (auto expr : exprs) {
+    if ((*expr)->type() == ExprType::COMPARISON) {
+      auto comparison_expr = static_cast<ComparisonExpr *>(expr->get());
       // 简单处理，就找等值查询
       if (comparison_expr->comp() != EQUAL_TO) {
         continue;
@@ -185,12 +201,12 @@ RC PhysicalPlanGenerator::create_plan(
         &value,
         true /*right_inclusive*/);
 
-    index_scan_oper->set_predicates(std::move(predicates));
+    index_scan_oper->set_predicate(std::move(predicate));
     oper = unique_ptr<PhysicalOperator>(index_scan_oper);
     LOG_TRACE("use index scan");
   } else {
     auto table_scan_oper = new TableScanPhysicalOperator(table, table_get_oper.read_write_mode());
-    table_scan_oper->set_predicates(std::move(predicates));
+    table_scan_oper->set_predicate(std::move(predicate));
     oper = unique_ptr<PhysicalOperator>(table_scan_oper);
     LOG_TRACE("use table scan");
   }
@@ -410,11 +426,11 @@ RC PhysicalPlanGenerator::create_plan(
 RC PhysicalPlanGenerator::create_vec_plan(
     TableGetLogicalOperator &table_get_oper, unique_ptr<PhysicalOperator> &oper, Session *session)
 {
-  vector<unique_ptr<Expression>> &predicates = table_get_oper.predicates();
+  unique_ptr<Expression> &predicate = table_get_oper.predicate();
   Table                          *table      = table_get_oper.table();
   TableScanVecPhysicalOperator   *table_scan_oper =
       new TableScanVecPhysicalOperator(table, table_get_oper.read_write_mode());
-  table_scan_oper->set_predicates(std::move(predicates));
+  table_scan_oper->set_predicate(std::move(predicate));
   oper = unique_ptr<PhysicalOperator>(table_scan_oper);
   LOG_TRACE("use vectorized table scan");
 
