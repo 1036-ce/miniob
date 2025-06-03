@@ -29,6 +29,7 @@ public:
   RC multiply(const Value &left, const Value &right, Value &result) const override;
   RC divide(const Value &left, const Value &right, Value &result) const override;
   RC negative(const Value &val, Value &result) const override;
+  RC hash(const Value &val, std::size_t& result) const override;
 
   RC cast_to(const Value &val, AttrType type, Value &result) const override;
 

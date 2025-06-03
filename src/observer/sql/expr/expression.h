@@ -134,6 +134,8 @@ public:
    */
   virtual RC related_tables(std::vector<const Table *> &tables) const { return RC::UNSUPPORTED; }
 
+  virtual string to_string() const { return ""; }
+
 protected:
   /**
    * @brief 表达式在下层算子返回的 chunk 中的位置
@@ -162,6 +164,8 @@ public:
   RC get_value(const Tuple &tuple, Value &value) const override { return RC::UNIMPLEMENTED; }  // 不需要实现
 
   const char *table_name() const { return table_name_.c_str(); }
+
+  string to_string() const override { return "*"; }
 
 private:
   string table_name_;
@@ -225,6 +229,14 @@ public:
 
   RC related_tables(vector<const Table *> &tables) const override;
 
+  string to_string() const override
+  {
+    string ret = field_.table_name();
+    ret.push_back('.');
+    ret.append(field_.field_name());
+    return ret;
+  }
+
 private:
   Field field_;
 };
@@ -262,6 +274,8 @@ public:
 
   RC related_tables(vector<const Table *> &tables) const override { return RC::SUCCESS; }
 
+  string to_string() const override { return value_.to_string(); }
+
 private:
   Value value_;
 };
@@ -289,6 +303,15 @@ public:
   unique_ptr<Expression> &child() { return child_; }
 
   RC related_tables(vector<const Table *> &tables) const override { return RC::SUCCESS; }
+
+  string to_string() const override
+  {
+    string ret = attr_type_to_string(cast_type_);
+    ret.push_back('(');
+    ret.append(child_->to_string());
+    ret.push_back(')');
+    return ret;
+  }
 
 private:
   RC cast(const Value &value, Value &cast_value) const;
@@ -345,6 +368,16 @@ public:
 
   RC related_tables(vector<const Table *> &tables) const override;
 
+  string to_string() const override
+  {
+    string ret = left_->to_string();
+    ret.push_back(' ');
+    ret.append(comp2str(comp_));
+    ret.push_back(' ');
+    ret.append(right_->to_string());
+    return ret;
+  }
+
 private:
   CompOp                 comp_;
   unique_ptr<Expression> left_;
@@ -369,7 +402,6 @@ public:
 public:
   ConjunctionExpr(Type type, Expression *left, Expression *right);
   ConjunctionExpr(Type type, unique_ptr<Expression> left, unique_ptr<Expression> right);
-  ConjunctionExpr(Type type, vector<unique_ptr<Expression>> &children);
   virtual ~ConjunctionExpr() = default;
 
   unique_ptr<Expression> copy() const override
@@ -396,6 +428,20 @@ public:
   auto extract(const vector<const Table *> &target_tables) -> unique_ptr<Expression>;
 
   auto simplify() -> unique_ptr<Expression>;
+
+  string to_string() const override
+  {
+    string ret = left_->to_string();
+
+    if (conjunction_type_ == Type::AND) {
+      ret.append(" and ");
+    } else if (conjunction_type_ == Type::OR) {
+      ret.append(" or ");
+    }
+
+    ret.append(right_->to_string());
+    return ret;
+  }
 
 private:
   Type                           conjunction_type_;
@@ -458,6 +504,24 @@ public:
 
   unique_ptr<Expression> &left() { return left_; }
   unique_ptr<Expression> &right() { return right_; }
+
+  string to_string() const override
+  {
+    string ret = left_->to_string();
+    if (arithmetic_type_ == Type::NEGATIVE) {
+      return string("-") + ret;
+    }
+
+    switch (arithmetic_type_) {
+      case Type::ADD: ret.append(" + "); break;
+      case Type::SUB: ret.append(" - "); break;
+      case Type::MUL: ret.append(" * "); break;
+      case Type::DIV: ret.append(" / "); break;
+      default: break;
+    }
+    ret.append(right_->to_string());
+    return ret;
+  }
 
 private:
   RC calc_value(const Value &left_value, const Value &right_value, Value &value) const;
@@ -538,6 +602,23 @@ public:
   unique_ptr<Aggregator> create_aggregator() const;
 
   RC related_tables(vector<const Table *> &tables) const override { return child_->related_tables(tables); }
+
+  string to_string() const override
+  {
+    string ret;
+    switch (aggregate_type_) {
+      case Type::AVG: ret = "AVG"; break;
+      case Type::COUNT: ret = "COUNT"; break;
+      case Type::MAX: ret = "MAX"; break;
+      case Type::MIN: ret = "MIN"; break;
+      case Type::SUM: ret = "SUM"; break;
+      default: break;
+    }
+    ret.push_back('(');
+    ret.append(child_->to_string());
+    ret.push_back(')');
+    return ret;
+  }
 
 public:
   static RC type_from_string(const char *type_str, Type &type);

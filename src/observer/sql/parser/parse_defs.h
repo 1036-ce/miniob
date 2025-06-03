@@ -56,6 +56,8 @@ enum CompOp
   NO_OP
 };
 
+string comp2str(CompOp comp);
+
 /**
  * @brief 表示一个条件比较
  * @ingroup SQLParser
@@ -78,6 +80,31 @@ struct ConditionSqlNode
 };
 
 /**
+ * @brief 描述Join类型
+ * @ingroup SQLParser
+ */
+enum JoinType
+{
+  CROSS,
+  INNER
+};
+
+struct UnboundTable {
+  virtual ~UnboundTable() = default;
+};
+
+struct UnboundSingleTable : public UnboundTable {
+  string relation_name;
+};
+
+struct UnboundJoinedTable : public UnboundTable {
+  JoinType type;
+  unique_ptr<Expression> expr;
+  unique_ptr<UnboundTable> left;
+  unique_ptr<UnboundTable> right;
+};
+
+/**
  * @brief 描述一个select语句
  * @ingroup SQLParser
  * @details 一个正常的select语句描述起来比这个要复杂很多，这里做了简化。
@@ -91,10 +118,9 @@ struct ConditionSqlNode
 struct SelectSqlNode
 {
   vector<unique_ptr<Expression>> expressions;  ///< 查询的表达式
-  vector<string>                 relations;    ///< 查询的表
-  // vector<ConditionSqlNode>       conditions;   ///< 查询条件，使用AND串联起来多个条件
+  unique_ptr<UnboundTable>       table_refs;
   vector<unique_ptr<Expression>> group_by;     ///< group by clause
-  unique_ptr<Expression>         condition;
+  unique_ptr<Expression>         condition;    ///< 查询条件
 };
 
 /**

@@ -61,6 +61,11 @@ RC FloatType::negative(const Value &val, Value &result) const
   return RC::SUCCESS;
 }
 
+RC FloatType::hash(const Value &val, std::size_t& result) const {
+  result = std::hash<float>{}(val.get_float());
+  return RC::SUCCESS;
+}
+
 RC FloatType::set_value_from_str(Value &val, const string &data) const
 {
   RC                rc = RC::SUCCESS;

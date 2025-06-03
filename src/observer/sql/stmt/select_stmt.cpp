@@ -38,35 +38,26 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     return RC::INVALID_ARGUMENT;
   }
 
+  RC rc = RC::SUCCESS;
   BinderContext binder_context;
 
   // collect tables in `from` statement
-  vector<Table *>                tables;
   unordered_map<string, Table *> table_map;
-  for (size_t i = 0; i < select_sql.relations.size(); i++) {
-    const char *table_name = select_sql.relations[i].c_str();
-    if (nullptr == table_name) {
-      LOG_WARN("invalid argument. relation name is null. index=%d", i);
-      return RC::INVALID_ARGUMENT;
-    }
-
-    Table *table = db->find_table(table_name);
-    if (nullptr == table) {
-      LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
-      return RC::SCHEMA_TABLE_NOT_EXIST;
-    }
-
-    binder_context.add_table(table);
-    tables.push_back(table);
-    table_map.insert({table_name, table});
+  if (OB_FAIL(rc = collect_tables(db, select_sql.table_refs.get(), table_map, binder_context))) {
+    return rc;
   }
+  /* for (auto& [_, table]: table_map) {
+   *   binder_context.add_table(table);
+   * } */
 
   // collect query fields in `select` statement
   vector<unique_ptr<Expression>> bound_expressions;
   ExpressionBinder               expression_binder(binder_context);
 
+  unique_ptr<BoundTable> tables = bind_tables(table_map, expression_binder, select_sql.table_refs.get());
+
   for (unique_ptr<Expression> &expression : select_sql.expressions) {
-    RC rc = expression_binder.bind_expression(expression, bound_expressions);
+    rc = expression_binder.bind_expression(expression, bound_expressions);
     if (OB_FAIL(rc)) {
       LOG_INFO("bind expression failed. rc=%s", strrc(rc));
       return rc;
@@ -83,13 +74,13 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   }
 
   Table *default_table = nullptr;
-  if (tables.size() == 1) {
-    default_table = tables[0];
+  if (table_map.size() == 1) {
+    default_table = table_map.begin()->second;
   }
 
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
-  RC rc = FilterStmt::create(db, default_table, &table_map, std::move(select_sql.condition), filter_stmt);
+  rc = FilterStmt::create(db, default_table, &table_map, std::move(select_sql.condition), filter_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");
     return rc;
@@ -98,10 +89,69 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
 
-  select_stmt->tables_.swap(tables);
+  select_stmt->tables_.reset(tables.release());
   select_stmt->query_expressions_.swap(bound_expressions);
   select_stmt->filter_stmt_ = filter_stmt;
   select_stmt->group_by_.swap(group_by_expressions);
   stmt = select_stmt;
   return RC::SUCCESS;
+}
+
+auto SelectStmt::collect_tables(Db *db, UnboundTable *unbound_table, unordered_map<string, Table *> &table_map, BinderContext& binder_context) -> RC
+{
+  if (UnboundSingleTable *single_table = dynamic_cast<UnboundSingleTable *>(unbound_table); single_table != nullptr) {
+    const char *table_name = single_table->relation_name.c_str();
+    if (nullptr == table_name) {
+      return RC::INVALID_ARGUMENT;
+    }
+
+    Table *table = db->find_table(table_name);
+    if (nullptr == table) {
+      LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+      return RC::SCHEMA_TABLE_NOT_EXIST;
+    }
+    table_map.insert({table_name, table});
+    binder_context.add_table(table);
+    return RC::SUCCESS;
+  }
+
+  if (UnboundJoinedTable* joined_table = dynamic_cast<UnboundJoinedTable*>(unbound_table); joined_table != nullptr) {
+    RC rc = RC::SUCCESS;
+    auto left = joined_table->left.get();
+    auto right = joined_table->right.get();
+    if (OB_FAIL(rc = collect_tables(db, left, table_map, binder_context))) {
+      return rc;
+    }
+    if (OB_FAIL(rc = collect_tables(db, right, table_map, binder_context))) {
+      return rc;
+    }
+    return RC::SUCCESS;
+  }
+
+  return RC::UNSUPPORTED;
+}
+
+auto SelectStmt::bind_tables(const unordered_map<string, Table*>& table_map, ExpressionBinder& expr_binder, UnboundTable* unbound_table) -> unique_ptr<BoundTable> {
+  if (UnboundSingleTable *single_table = dynamic_cast<UnboundSingleTable *>(unbound_table); single_table != nullptr) {
+    // single_table->relation_name 一定存在
+    Table* table = table_map.at(single_table->relation_name);
+    return make_unique<BoundSingleTable>(table);
+  }
+
+  if (UnboundJoinedTable* joined_table = dynamic_cast<UnboundJoinedTable*>(unbound_table); joined_table != nullptr) {
+    auto left = bind_tables(table_map, expr_binder, joined_table->left.get());
+    auto right = bind_tables(table_map, expr_binder, joined_table->right.get());
+
+    if (joined_table->expr) {
+      vector<unique_ptr<Expression>> bound_expressions;
+      expr_binder.bind_expression(joined_table->expr, bound_expressions);
+      ASSERT(bound_expressions.size() == 1, "bound_expressions' size must be 1");
+
+      return make_unique<BoundJoinedTable>(joined_table->type, std::move(bound_expressions.at(0)), std::move(left), std::move(right));
+    }
+    return make_unique<BoundJoinedTable>(joined_table->type, nullptr, std::move(left), std::move(right));
+  }
+
+  ASSERT(false, "Unreachable code touched");
+  return nullptr;
 }

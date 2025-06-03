@@ -39,11 +39,14 @@ public:
 
   OpType get_op_type() const override { return OpType::LOGICALINNERJOIN; }
 
-  vector<unique_ptr<Expression>> &get_join_predicates() { return join_predicates_; }
+/*   vector<unique_ptr<Expression>> &get_join_predicates() { return join_predicates_; }
+ * 
+ *   void clear_join_predicates() { join_predicates_.clear(); }
+ * 
+ *   auto add_join_predicate(unique_ptr<Expression> &&predicate) { join_predicates_.push_back(std::move(predicate)); } */
+  unique_ptr<Expression>& join_predicate() { return join_predicate_; }
 
-  void clear_join_predicates() { join_predicates_.clear(); }
-
-  auto add_join_predicate(unique_ptr<Expression> &&predicate) { join_predicates_.push_back(std::move(predicate)); }
+  void set_join_predicate(unique_ptr<Expression> join_predicate) { join_predicate_ = std::move(join_predicate); }
 
   unique_ptr<LogicalProperty> find_log_prop(const vector<LogicalProperty *> &log_props) override
   {
@@ -54,22 +57,28 @@ public:
     LogicalProperty *left_log_prop  = log_props[0];
     LogicalProperty *right_log_prop = log_props[1];
     int              card           = left_log_prop->get_card() * right_log_prop->get_card();
-    for (auto &predicate : join_predicates_) {
-      if (predicate->type() != ExprType::COMPARISON) {
-        continue;
-      }
-      auto  pred_expr = dynamic_cast<ComparisonExpr *>(predicate.get());
-      auto &left      = pred_expr->left();
-      auto &right     = pred_expr->right();
-      if (pred_expr->comp() == CompOp::EQUAL_TO && left->type() == ExprType::FIELD &&
-          right->type() == ExprType::FIELD) {
-        card /= std::max(std::max(left_log_prop->get_card(), right_log_prop->get_card()), 1);
-      }
-    }
+    // TODO: fix it
+    /* for (auto &predicate : join_predicates_) {
+     *   if (predicate->type() != ExprType::COMPARISON) {
+     *     continue;
+     *   }
+     *   auto  pred_expr = dynamic_cast<ComparisonExpr *>(predicate.get());
+     *   auto &left      = pred_expr->left();
+     *   auto &right     = pred_expr->right();
+     *   if (pred_expr->comp() == CompOp::EQUAL_TO && left->type() == ExprType::FIELD &&
+     *       right->type() == ExprType::FIELD) {
+     *     card /= std::max(std::max(left_log_prop->get_card(), right_log_prop->get_card()), 1);
+     *   }
+     * } */
     return make_unique<LogicalProperty>(card);
   }
 
+  void     set_join_type(JoinType type) { type_ = type; }
+  JoinType join_type() { return type_; }
+
 private:
   LogicalOperator                    *predicate_op_ = nullptr;
-  std::vector<unique_ptr<Expression>> join_predicates_;
+  JoinType                            type_;
+  unique_ptr<Expression>              join_predicate_ = nullptr;
+  // std::vector<unique_ptr<Expression>> join_predicates_;
 };

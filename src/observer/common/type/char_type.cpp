@@ -21,6 +21,11 @@ int CharType::compare(const Value &left, const Value &right) const
       (void *)left.value_.pointer_value_, left.length_, (void *)right.value_.pointer_value_, right.length_);
 }
 
+RC CharType::hash(const Value &val, std::size_t& result) const {
+  result = std::hash<string>{}(val.get_string());
+  return RC::SUCCESS;
+}
+
 RC CharType::set_value_from_str(Value &val, const string &data) const
 {
   val.set_string(data.c_str());

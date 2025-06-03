@@ -18,6 +18,21 @@ See the Mulan PSL v2 for more details. */
 
 using namespace std;
 
+string comp2str(CompOp comp)
+{
+  switch (comp) {
+    case CompOp::EQUAL_TO: return "=";
+    case CompOp::LESS_EQUAL: return "<=";
+    case CompOp::NOT_EQUAL: return "<>";
+    case CompOp::LESS_THAN: return "<";
+    case CompOp::GREAT_EQUAL: return ">=";
+    case CompOp::GREAT_THAN: return ">";
+    case CompOp::IS: return "is";
+    case CompOp::IS_NOT: return "is not";
+    default: return "";
+  }
+}
+
 RC FieldExpr::get_value(const Tuple &tuple, Value &value) const
 {
   return tuple.find_cell(TupleCellSpec(table_name(), field_name()), value);
@@ -294,10 +309,6 @@ ConjunctionExpr::ConjunctionExpr(Type type, unique_ptr<Expression> left, unique_
     : conjunction_type_(type), left_(std::move(left)), right_(std::move(right))
 {}
 
-ConjunctionExpr::ConjunctionExpr(Type type, vector<unique_ptr<Expression>> &children)
-    : conjunction_type_(type), children_(std::move(children))
-{}
-
 RC ConjunctionExpr::get_value(const Tuple &tuple, Value &value) const
 {
   RC    rc = RC::SUCCESS;
@@ -323,8 +334,9 @@ RC ConjunctionExpr::get_value(const Tuple &tuple, Value &value) const
   return RC::SUCCESS;
 }
 
-RC ConjunctionExpr::try_get_value(Value &value) const {
-  RC rc = RC::SUCCESS;
+RC ConjunctionExpr::try_get_value(Value &value) const
+{
+  RC    rc = RC::SUCCESS;
   Value val;
 
   if (OB_FAIL(rc = left_->try_get_value(val))) {

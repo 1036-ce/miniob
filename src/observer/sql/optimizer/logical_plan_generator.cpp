@@ -108,19 +108,24 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     return rc;
   }
 
-  const vector<Table *> &tables = select_stmt->tables();
-  for (Table *table : tables) {
-
-    unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_ONLY));
-    if (table_oper == nullptr) {
-      table_oper = std::move(table_get_oper);
-    } else {
-      JoinLogicalOperator *join_oper = new JoinLogicalOperator;
-      join_oper->add_child(std::move(table_oper));
-      join_oper->add_child(std::move(table_get_oper));
-      table_oper = unique_ptr<LogicalOperator>(join_oper);
-    }
+  rc = create_plan(select_stmt->tables().get(), table_oper);
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to create table logical plan. rc=%s", strrc(rc));
+    return rc;
   }
+/*   const vector<Table *> &tables = select_stmt->tables();
+ *   for (Table *table : tables) {
+ * 
+ *     unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_ONLY));
+ *     if (table_oper == nullptr) {
+ *       table_oper = std::move(table_get_oper);
+ *     } else {
+ *       JoinLogicalOperator *join_oper = new JoinLogicalOperator;
+ *       join_oper->add_child(std::move(table_oper));
+ *       join_oper->add_child(std::move(table_get_oper));
+ *       table_oper = unique_ptr<LogicalOperator>(join_oper);
+ *     }
+ *   } */
 
   if (predicate_oper) {
     if (*last_oper) {
@@ -381,6 +386,38 @@ RC LogicalPlanGenerator::create_plan(ExplainStmt *explain_stmt, unique_ptr<Logic
   logical_operator = unique_ptr<LogicalOperator>(new ExplainLogicalOperator);
   logical_operator->add_child(std::move(child_oper));
   return rc;
+}
+
+RC LogicalPlanGenerator::create_plan(BoundTable *bound_table, unique_ptr<LogicalOperator> &logical_operator) {
+  if (BoundSingleTable *single_table = dynamic_cast<BoundSingleTable *>(bound_table); single_table != nullptr) {
+    unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(single_table->table(), ReadWriteMode::READ_ONLY));
+    logical_operator = std::move(table_get_oper);
+    return RC::SUCCESS;
+  }
+
+  if (BoundJoinedTable* joined_table = dynamic_cast<BoundJoinedTable*>(bound_table); joined_table != nullptr) {
+    RC rc = RC::SUCCESS;
+    auto left = joined_table->left().get();
+    auto right = joined_table->right().get();
+
+    unique_ptr<LogicalOperator> left_oper, right_oper;
+    if (OB_FAIL(rc = create_plan(left, left_oper))) {
+      return rc;
+    }
+    if (OB_FAIL(rc = create_plan(right, right_oper))) {
+      return rc;
+    }
+    JoinLogicalOperator *join_oper = new JoinLogicalOperator;
+    join_oper->add_child(std::move(left_oper));
+    join_oper->add_child(std::move(right_oper));
+    join_oper->set_join_type(joined_table->type());
+    join_oper->set_join_predicate(std::move(joined_table->expr()));
+    logical_operator.reset(join_oper);
+    return RC::SUCCESS;
+  }
+
+  LOG_WARN("Unreachable code touched");
+  return RC::UNSUPPORTED;
 }
 
 RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_ptr<LogicalOperator> &logical_operator)

@@ -100,6 +100,28 @@ Value &Value::operator=(Value &&other)
   return *this;
 }
 
+bool Value::operator==(const Value& other) const {
+  if (attr_type_ != other.attr_type_) {
+    return false;
+  }
+
+  switch(attr_type_) {
+    case AttrType::CHARS:
+    case AttrType::BITMAP:
+      return strcmp(value_.pointer_value_, other.value_.pointer_value_) == 0;
+    case AttrType::INTS:
+      return value_.int_value_ == other.value_.int_value_;
+    case AttrType::FLOATS:
+      return value_.float_value_ == other.value_.float_value_;
+    case AttrType::DATES:
+      return value_.date_value_ == other.value_.date_value_;
+    case AttrType::BOOLEANS:
+      return value_.bool_value_ == other.value_.bool_value_;
+    default:
+      return false;
+  }
+}
+
 void Value::reset()
 {
   switch (attr_type_) {

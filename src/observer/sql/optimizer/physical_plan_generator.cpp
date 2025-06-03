@@ -129,25 +129,23 @@ RC PhysicalPlanGenerator::create_vec(
 RC PhysicalPlanGenerator::create_plan(
     TableGetLogicalOperator &table_get_oper, unique_ptr<PhysicalOperator> &oper, Session *session)
 {
-  unique_ptr<Expression> &predicate = table_get_oper.predicate();
+  unique_ptr<Expression>          &predicate = table_get_oper.predicate();
   vector<unique_ptr<Expression> *> exprs;
 
   if (predicate) {
     if (predicate->type() == ExprType::CONJUNCTION) {
       ConjunctionExpr *conjunction_expr = static_cast<ConjunctionExpr *>(predicate.get());
-      exprs = conjunction_expr->flatten();
-    }
-    else if (predicate->type() == ExprType::COMPARISON) {
+      exprs                             = conjunction_expr->flatten();
+    } else if (predicate->type() == ExprType::COMPARISON) {
       exprs.push_back(&predicate);
-    }
-    else {
+    } else {
       LOG_WARN("Predicate must be COMPARISON or CONJUNCTION");
       return RC::UNSUPPORTED;
     }
   }
 
   // 看看是否有可以用于索引查找的表达式
-  Table *table = table_get_oper.table();
+  Table     *table      = table_get_oper.table();
   Index     *index      = nullptr;
   ValueExpr *value_expr = nullptr;
 
@@ -357,10 +355,36 @@ RC PhysicalPlanGenerator::create_plan(
     LOG_WARN("join operator should have 2 children, but have %d", child_opers.size());
     return RC::INTERNAL;
   }
-  if (session->hash_join_on() && can_use_hash_join(join_oper)) {
-    // your code here
+  // if (session->hash_join_on() && can_use_hash_join(join_oper)) {
+  if (can_use_hash_join(join_oper)) {
+    LOG_TRACE("use hash join");
+    HashJoinPhysicalOperator* join_physical_oper = new HashJoinPhysicalOperator();
+    for (auto &child_oper : child_opers) {
+      unique_ptr<PhysicalOperator> child_physical_oper;
+      rc = create(*child_oper, child_physical_oper, session);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to create physical child oper. rc=%s", strrc(rc));
+        return rc;
+      }
+      join_physical_oper->add_child(std::move(child_physical_oper));
+    }
+
+    auto& join_predicate = join_oper.join_predicate();
+    if (join_predicate->type() == ExprType::COMPARISON) {
+      auto comp_expr = static_cast<ComparisonExpr*>(join_predicate.get());
+      join_physical_oper->left_key_exprs().emplace_back(std::move(comp_expr->left()));
+      join_physical_oper->right_key_exprs().emplace_back(std::move(comp_expr->right()));
+    }
+    else {
+      delete join_physical_oper;
+      return RC::UNIMPLEMENTED;
+    }
+
+    oper.reset(join_physical_oper);
   } else {
-    unique_ptr<PhysicalOperator> join_physical_oper(new NestedLoopJoinPhysicalOperator());
+    LOG_TRACE("use nlj join");
+    NestedLoopJoinPhysicalOperator* join_physical_oper = new NestedLoopJoinPhysicalOperator();
+
     for (auto &child_oper : child_opers) {
       unique_ptr<PhysicalOperator> child_physical_oper;
       rc = create(*child_oper, child_physical_oper, session);
@@ -371,15 +395,40 @@ RC PhysicalPlanGenerator::create_plan(
 
       join_physical_oper->add_child(std::move(child_physical_oper));
     }
+    if (join_oper.join_predicate()) {
+      join_physical_oper->set_join_predicate(std::move(join_oper.join_predicate()));
+    } 
 
-    oper = std::move(join_physical_oper);
+    oper.reset(join_physical_oper);
+    // oper = std::move(join_physical_oper);
   }
   return rc;
 }
 
 bool PhysicalPlanGenerator::can_use_hash_join(JoinLogicalOperator &join_oper)
 {
-  // your code here
+  if (join_oper.join_type() != JoinType::INNER) {
+    return false;
+  }
+
+  auto &predicate = join_oper.join_predicate();
+  if (predicate->type() == ExprType::COMPARISON) {
+    auto comp_expr = static_cast<ComparisonExpr *>(predicate.get());
+    return comp_expr->comp() == CompOp::EQUAL_TO;
+  }
+
+  if (predicate->type() == ExprType::CONJUNCTION) {
+    auto conjunction_expr = static_cast<ConjunctionExpr *>(predicate.get());
+    auto exprs            = conjunction_expr->flatten();
+    for (auto expr : exprs) {
+      auto comp_expr = static_cast<ComparisonExpr *>(expr->get());
+      if (comp_expr->comp() != CompOp::EQUAL_TO) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   return false;
 }
 
@@ -426,9 +475,9 @@ RC PhysicalPlanGenerator::create_plan(
 RC PhysicalPlanGenerator::create_vec_plan(
     TableGetLogicalOperator &table_get_oper, unique_ptr<PhysicalOperator> &oper, Session *session)
 {
-  unique_ptr<Expression> &predicate = table_get_oper.predicate();
-  Table                          *table      = table_get_oper.table();
-  TableScanVecPhysicalOperator   *table_scan_oper =
+  unique_ptr<Expression>       &predicate = table_get_oper.predicate();
+  Table                        *table     = table_get_oper.table();
+  TableScanVecPhysicalOperator *table_scan_oper =
       new TableScanVecPhysicalOperator(table, table_get_oper.read_write_mode());
   table_scan_oper->set_predicate(std::move(predicate));
   oper = unique_ptr<PhysicalOperator>(table_scan_oper);

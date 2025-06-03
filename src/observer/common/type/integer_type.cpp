@@ -113,6 +113,11 @@ RC IntegerType::negative(const Value &val, Value &result) const
   return RC::SUCCESS;
 }
 
+RC IntegerType::hash(const Value &val, std::size_t& result) const {
+  result = std::hash<int>{}(val.get_int());
+  return RC::SUCCESS;
+}
+
 RC IntegerType::set_value_from_str(Value &val, const string &data) const
 {
   RC           rc = RC::SUCCESS;

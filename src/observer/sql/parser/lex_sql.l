@@ -128,6 +128,8 @@ ANALYZE                                 RETURN_TOKEN(ANALYZE);
 NOT                                     RETURN_TOKEN(NOT);
 NULL                                    RETURN_TOKEN(NULL_T);
 IS                                      RETURN_TOKEN(IS_T);
+INNER                                   RETURN_TOKEN(INNER_T);
+JOIN                                    RETURN_TOKEN(JOIN_T);
 {ID}                                    yylval->cstring=strdup(yytext); static_cast<std::vector<char*>*>(yyextra)->push_back(yylval->cstring); RETURN_TOKEN(ID);
 "("                                     RETURN_TOKEN(LBRACE);
 ")"                                     RETURN_TOKEN(RBRACE);

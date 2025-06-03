@@ -55,6 +55,8 @@ public:
   Value &operator=(const Value &other);
   Value &operator=(Value &&other);
 
+  bool operator==(const Value& other) const;
+
   void reset();
 
   static RC add(const Value &left, const Value &right, Value &result)
@@ -104,6 +106,14 @@ public:
       return RC::SUCCESS;
     }
     return DataType::type_instance(result.attr_type())->negative(value, result);
+  }
+
+  static RC hash(const Value &value, std::size_t &result) {
+    if (value.is_null()) {
+      result = 0;
+      return RC::SUCCESS;
+    }
+    return DataType::type_instance(value.attr_type())->hash(value, result);
   }
 
   static RC cast_to(const Value &value, AttrType to_type, Value &result)

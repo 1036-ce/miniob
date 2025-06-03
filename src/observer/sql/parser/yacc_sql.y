@@ -1,4 +1,3 @@
-
 %{
 
 #include <stdio.h>
@@ -113,6 +112,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         NOT
         NULL_T
         IS_T
+        INNER_T
+        JOIN_T
         EQ
         LT
         GT
@@ -131,7 +132,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   Expression *                               expression;
   vector<unique_ptr<Expression>> *           expression_list;
   vector<RelAttrSqlNode> *                   rel_attr_list;
-  vector<string> *                           relation_list;
+  UnboundTable*                                  table_ref;
   vector<string> *                           key_list;
   Assignment *                               assignment;
   std::vector<unique_ptr<Assignment>> *      assignment_list;
@@ -161,13 +162,15 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <cstring>             storage_format
 %type <key_list>            primary_key
 %type <key_list>            attr_list
-%type <relation_list>       rel_list
+%type <table_ref>           table_refs
+%type <table_ref>           table_factor
+%type <table_ref>           joined_table
+// %type <relation_list>       rel_list
 %type <expression>          expression
 %type <expression>          boolean_primary
 %type <expression>          predicate
 %type <expression>          bit_expr
 %type <expression>          simple_expr
-%type <cstring>             aggre_name
 %type <expression_list>     expression_list
 %type <expression_list>     group_by
 %type <assignment>          assignment
@@ -437,6 +440,7 @@ insert_stmt:        /*insert   语句的语法解析树*/
         for (const std::unique_ptr<Expression>& expr: *$6) {
           Value val;
           if (OB_FAIL(expr->try_get_value(val))) {
+            delete $6;
             YYERROR;
           }
           $$->insertion.values.push_back(val);
@@ -529,7 +533,8 @@ update_stmt:      /*  update 语句的语法解析树*/
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM rel_list where group_by
+    // SELECT expression_list FROM rel_list where group_by
+    SELECT expression_list FROM table_refs where group_by
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -538,8 +543,8 @@ select_stmt:        /*  select 语句的语法解析树*/
       }
 
       if ($4 != nullptr) {
-        $$->selection.relations.swap(*$4);
-        delete $4;
+        // $$->selection.relations.swap(*$4);
+        $$->selection.table_refs.reset($4);
       }
 
       if ($5 != nullptr) {
@@ -655,13 +660,9 @@ simple_expr:
     | '-' simple_expr %prec UMINUS {
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::NEGATIVE, $2, nullptr, sql_string, &@$);
     }
-    | aggre_name LBRACE expression RBRACE {
+    | ID LBRACE expression RBRACE {
       $$ = create_aggregate_expression($1, $3, sql_string, &@$);
     }
-    ;
-
-aggre_name:
-    ID
     ;
 
 rel_attr:
@@ -681,19 +682,39 @@ relation:
       $$ = $1;
     }
     ;
-rel_list:
-    relation {
-      $$ = new vector<string>();
-      $$->push_back($1);
-    }
-    | relation COMMA rel_list {
-      if ($3 != nullptr) {
-        $$ = $3;
-      } else {
-        $$ = new vector<string>;
-      }
 
-      $$->insert($$->begin(), $1);
+table_refs:
+    table_factor {
+      $$ = $1;
+    }
+    | joined_table {
+      $$ = $1;
+    }
+    ;
+
+table_factor:
+    relation {
+      UnboundSingleTable* tmp = new UnboundSingleTable();
+      tmp->relation_name = $1;
+      $$ = tmp;
+    }
+    ;
+
+joined_table:
+    table_refs COMMA table_factor {
+      UnboundJoinedTable* tmp = new UnboundJoinedTable();
+      tmp->type = JoinType::CROSS;
+      tmp->left.reset($1);
+      tmp->right.reset($3);
+      $$ = tmp;
+    }
+    | table_refs INNER_T JOIN_T table_factor ON expression {
+      UnboundJoinedTable* tmp = new UnboundJoinedTable();
+      tmp->type = JoinType::INNER;
+      tmp->left.reset($1);
+      tmp->right.reset($4);
+      tmp->expr.reset($6);
+      $$ = tmp;
     }
     ;
 

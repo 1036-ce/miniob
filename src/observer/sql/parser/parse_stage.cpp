@@ -30,7 +30,7 @@ RC ParseStage::handle_request(SQLStageEvent *sql_event)
 {
   RC rc = RC::SUCCESS;
 
-  SqlResult         *sql_result = sql_event->session_event()->sql_result();
+  SqlResult    *sql_result = sql_event->session_event()->sql_result();
   const string &sql        = sql_event->sql();
 
   ParsedSqlResult parsed_sql_result;
@@ -51,7 +51,8 @@ RC ParseStage::handle_request(SQLStageEvent *sql_event)
     // set error information to event
     rc = RC::SQL_SYNTAX;
     sql_result->set_return_code(rc);
-    sql_result->set_state_string("Failed to parse sql");
+    // 使解析失败时也输出Failure
+    // sql_result->set_state_string("Failed to parse sql");
     return rc;
   }
 

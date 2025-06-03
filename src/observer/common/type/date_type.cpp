@@ -65,6 +65,11 @@ RC DateType::multiply(const Value &left, const Value &right, Value &result) cons
 
 RC DateType::negative(const Value &val, Value &result) const { return RC::UNSUPPORTED; }
 
+RC DateType::hash(const Value &val, std::size_t& result) const {
+  result = std::hash<int32_t>{}(val.value_.date_value_);
+  return RC::SUCCESS;
+}
+
 RC DateType::set_value_from_str(Value &val, const string &data) const
 {
   date_t date{.year = 0, .month = 0, .day = 0};
