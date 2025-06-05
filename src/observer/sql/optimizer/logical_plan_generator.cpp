@@ -218,7 +218,7 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
 
   if (filter_stmt->predicate()->type() == ExprType::CONJUNCTION) {
     ConjunctionExpr *conjunction_expr = static_cast<ConjunctionExpr *>(filter_stmt->predicate().get());
-    exprs = conjunction_expr->flatten();
+    exprs = conjunction_expr->flatten(ExprType::COMPARISON);
   }
   else if (filter_stmt->predicate()->type() == ExprType::COMPARISON) {
     exprs.push_back(&filter_stmt->predicate());

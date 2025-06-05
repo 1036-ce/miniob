@@ -135,7 +135,7 @@ RC PhysicalPlanGenerator::create_plan(
   if (predicate) {
     if (predicate->type() == ExprType::CONJUNCTION) {
       ConjunctionExpr *conjunction_expr = static_cast<ConjunctionExpr *>(predicate.get());
-      exprs                             = conjunction_expr->flatten();
+      exprs                             = conjunction_expr->flatten(ExprType::COMPARISON);
     } else if (predicate->type() == ExprType::COMPARISON) {
       exprs.push_back(&predicate);
     } else {
@@ -419,7 +419,7 @@ bool PhysicalPlanGenerator::can_use_hash_join(JoinLogicalOperator &join_oper)
 
   if (predicate->type() == ExprType::CONJUNCTION) {
     auto conjunction_expr = static_cast<ConjunctionExpr *>(predicate.get());
-    auto exprs            = conjunction_expr->flatten();
+    auto exprs            = conjunction_expr->flatten(ExprType::COMPARISON);
     for (auto expr : exprs) {
       auto comp_expr = static_cast<ComparisonExpr *>(expr->get());
       if (comp_expr->comp() != CompOp::EQUAL_TO) {

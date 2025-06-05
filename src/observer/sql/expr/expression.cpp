@@ -369,7 +369,7 @@ RC ConjunctionExpr::related_tables(vector<const Table *> &tables) const
   return right_->related_tables(tables);
 }
 
-auto ConjunctionExpr::flatten() -> vector<unique_ptr<Expression> *>
+auto ConjunctionExpr::flatten(ExprType type) -> vector<unique_ptr<Expression> *>
 {
   vector<unique_ptr<Expression> *> ret;
 
@@ -381,8 +381,17 @@ auto ConjunctionExpr::flatten() -> vector<unique_ptr<Expression> *>
     auto expr = que.front();
     que.pop();
 
-    if ((*expr)->type() == ExprType::COMPARISON) {
+    if ((*expr)->type() == type) {
       ret.push_back(expr);
+      continue;
+    }
+
+    if ((*expr)->type() == ExprType::COMPARISON) {
+      auto                    comp_expr = static_cast<ComparisonExpr *>((*expr).get());
+      unique_ptr<Expression> *left             = &comp_expr->left();
+      unique_ptr<Expression> *right            = &comp_expr->right();
+      que.push(left);
+      que.push(right);
     } else if ((*expr)->type() == ExprType::CONJUNCTION) {
       auto                    conjunction_expr = static_cast<ConjunctionExpr *>((*expr).get());
       unique_ptr<Expression> *left             = &conjunction_expr->left_;
@@ -390,7 +399,7 @@ auto ConjunctionExpr::flatten() -> vector<unique_ptr<Expression> *>
       que.push(left);
       que.push(right);
     } else {
-      continue;
+      ASSERT(false, "Not Supported");
     }
   }
   return ret;
@@ -415,7 +424,7 @@ auto ConjunctionExpr::extract(const vector<const Table *> &target_tables) -> uni
   auto ret              = this->copy();
   auto conjunction_expr = static_cast<ConjunctionExpr *>(ret.get());
 
-  vector<unique_ptr<Expression> *> exprs = conjunction_expr->flatten();
+  vector<unique_ptr<Expression> *> exprs = conjunction_expr->flatten(ExprType::COMPARISON);
   vector<const Table *>            tables;
 
   for (auto expr : exprs) {

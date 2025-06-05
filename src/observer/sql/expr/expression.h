@@ -423,7 +423,7 @@ public:
 
   vector<unique_ptr<Expression>> &children() { return children_; }
 
-  auto flatten() -> vector<unique_ptr<Expression> *>;
+  auto flatten(ExprType type) -> vector<unique_ptr<Expression> *>;
 
   auto extract(const vector<const Table *> &target_tables) -> unique_ptr<Expression>;
 
@@ -626,4 +626,7 @@ public:
 private:
   Type                   aggregate_type_;
   unique_ptr<Expression> child_;
+};
+
+class SubQueryExpr : public Expression {
 };
