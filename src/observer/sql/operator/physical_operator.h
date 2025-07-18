@@ -54,6 +54,7 @@ enum class PhysicalOperatorType
   GROUP_BY_VEC,
   AGGREGATE_VEC,
   EXPR_VEC,
+  MOCK,
 };
 
 /**
@@ -89,8 +90,17 @@ public:
 
   void add_child(unique_ptr<PhysicalOperator> oper) { children_.emplace_back(std::move(oper)); }
 
+  void set_env_tuple(const Tuple* env_tuple) {
+    for (auto& child: children_) {
+      child->set_env_tuple(env_tuple);
+    }
+    env_tuple_ = env_tuple;
+  }
+
   vector<unique_ptr<PhysicalOperator>> &children() { return children_; }
 
 protected:
   vector<unique_ptr<PhysicalOperator>> children_;
+  const Tuple* env_tuple_{nullptr};
+  Trx* trx_;
 };

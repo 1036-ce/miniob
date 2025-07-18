@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/unordered_map.h"
 #include "common/lang/vector.h"
 #include "sql/expr/expression.h"
+#include "sql/parser/expression_binder.h"
 #include "sql/parser/parse_defs.h"
 #include "sql/stmt/stmt.h"
 
@@ -82,6 +83,7 @@ public:
 
 public:
   static RC create(Db *db, Table *default_table, unordered_map<string, Table *> *tables, unique_ptr<Expression> predicate, FilterStmt *&stmt);
+  static RC create(Db *db, BinderContext& binder_context, unique_ptr<Expression> predicate, FilterStmt *&stmt);
   auto predicate() -> unique_ptr<Expression> & { return predicate_; }
 
 private:

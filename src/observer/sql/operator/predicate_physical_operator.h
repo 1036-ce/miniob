@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include "sql/expr/expression.h"
+#include "sql/expr/subquery_expression.h"
 #include "sql/operator/physical_operator.h"
 
 class FilterStmt;
@@ -22,6 +23,8 @@ class FilterStmt;
 /**
  * @brief 过滤/谓词物理算子
  * @ingroup PhysicalOperator
+ *
+ * @detail 如果Predicate有多个children, 默认最后一个为当前查询的operator，前面的所有均为子查询
  */
 class PredicatePhysicalOperator : public PhysicalOperator
 {
@@ -41,6 +44,30 @@ public:
 
   RC tuple_schema(TupleSchema &schema) const override;
 
+  void add_subquery(SubQueryExpr* subquery) {
+    subqueries_.push_back(subquery);
+  }
+/*   void add_subquery_child(unique_ptr<PhysicalOperator> oper) { 
+ *     children_.emplace_back(std::move(oper)); 
+ *     is_subquery_.push_back(1);
+ *   }
+ * 
+ *   void add_non_subquery_child(unique_ptr<PhysicalOperator> oper) { 
+ *     children_.emplace_back(std::move(oper)); 
+ *     is_subquery_.push_back(0);
+ *   } */
+
 private:
+
+  RC open_correlated_subquery();
+  RC close_correlated_subquery();
+  ComparisonExpr* find_subquery_parent(SubQueryExpr* subquery);
+
   unique_ptr<Expression> expression_;
+
+  std::vector<SubQueryExpr*> subqueries_;
+
+
+  // vector<int> is_subquery_;  // 如过children_[i]是一个子查询, is_subquey_[i]==1, 否则is_subquey_[i]==0
+  // PhysicalOperator *non_subquery_child_{nullptr};
 };

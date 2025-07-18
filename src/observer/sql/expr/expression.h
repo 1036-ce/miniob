@@ -48,6 +48,7 @@ enum class ExprType
   CONJUNCTION,  ///< 多个表达式使用同一种关系(AND或OR)来联结
   ARITHMETIC,   ///< 算术运算
   AGGREGATION,  ///< 聚合运算
+  SUBQUERY,     ///< 子查询表达式
 };
 
 /**
@@ -379,6 +380,10 @@ public:
   }
 
 private:
+
+  RC       comp_in_handler(const Tuple &tuple, Value &value) const;
+  RC       comp_notin_handler(const Tuple &tuple, Value &value) const;
+
   CompOp                 comp_;
   unique_ptr<Expression> left_;
   unique_ptr<Expression> right_;
@@ -628,5 +633,3 @@ private:
   unique_ptr<Expression> child_;
 };
 
-class SubQueryExpr : public Expression {
-};

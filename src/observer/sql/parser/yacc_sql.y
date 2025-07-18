@@ -10,6 +10,7 @@
 #include "sql/parser/yacc_sql.hpp"
 #include "sql/parser/lex_sql.h"
 #include "sql/expr/expression.h"
+#include "sql/expr/subquery_expression.h"
 
 using namespace std;
 
@@ -47,6 +48,12 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   UnboundAggregateExpr *expr = new UnboundAggregateExpr(aggregate_name, child);
   expr->set_name(token_name(sql_string, llocp));
   return expr;
+}
+
+SubQueryExpr *create_subquery_expression(ParsedSqlNode* sql_node, const char *sql_string, YYLTYPE *llocp) {
+ SubQueryExpr *expr = new SubQueryExpr(sql_node);
+ expr->set_name(token_name(sql_string, llocp));
+ return expr;
 }
 
 %}
@@ -114,6 +121,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         IS_T
         INNER_T
         JOIN_T
+        IN_T
         EQ
         LT
         GT
@@ -171,6 +179,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <expression>          predicate
 %type <expression>          bit_expr
 %type <expression>          simple_expr
+%type <expression>          subquery_expr 
 %type <expression_list>     expression_list
 %type <expression_list>     group_by
 %type <assignment>          assignment
@@ -615,8 +624,6 @@ predicate:
     // }
     // | bit_expr IN expression_list {
     // }
-    // | bit_expr IN subquery {
-    // }
     ;
 
 
@@ -662,6 +669,15 @@ simple_expr:
     }
     | ID LBRACE expression RBRACE {
       $$ = create_aggregate_expression($1, $3, sql_string, &@$);
+    }
+    | subquery_expr {
+      $$ = $1;
+    }
+    ;
+
+subquery_expr:
+    LBRACE select_stmt RBRACE {
+      $$ = create_subquery_expression($2, sql_string, &@$);
     }
     ;
 
@@ -737,6 +753,8 @@ comp_op:
     | NE { $$ = NOT_EQUAL; }
     | IS_T { $$ = IS; }
     | IS_T NOT { $$ = IS_NOT; }
+    | IN_T { $$ = IN; }
+    | NOT IN_T { $$ = NOT_IN; }
     ;
 
 // your code here

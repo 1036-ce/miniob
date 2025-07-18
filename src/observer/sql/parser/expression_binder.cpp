@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/ranges.h"
 #include "sql/parser/expression_binder.h"
 #include "sql/expr/expression_iterator.h"
+#include "sql/expr/subquery_expression.h"
 
 using namespace common;
 
@@ -25,6 +26,16 @@ Table *BinderContext::find_table(const char *table_name) const
   auto pred = [table_name](Table *table) { return 0 == strcasecmp(table_name, table->name()); };
   auto iter = ranges::find_if(query_tables_, pred);
   if (iter == query_tables_.end()) {
+    return nullptr;
+  }
+  return *iter;
+}
+
+Table *BinderContext::find_outer_table(const char *table_name) const
+{
+  auto pred = [table_name](Table *table) { return 0 == strcasecmp(table_name, table->name()); };
+  auto iter = ranges::find_if(outer_query_tables_, pred);
+  if (iter == outer_query_tables_.end()) {
     return nullptr;
   }
   return *iter;
@@ -97,6 +108,10 @@ RC ExpressionBinder::bind_expression(unique_ptr<Expression> &expr, vector<unique
       return bind_arithmetic_expression(expr, bound_expressions);
     } break;
 
+    case ExprType::SUBQUERY: {
+      return bind_subquery_expression(expr, bound_expressions);
+    } break;
+
     case ExprType::AGGREGATION: {
       ASSERT(false, "shouldn't be here");
     } break;
@@ -164,8 +179,14 @@ RC ExpressionBinder::bind_unbound_field_expression(
   } else {
     table = context_.find_table(table_name);
     if (nullptr == table) {
-      LOG_INFO("no such table in from list: %s", table_name);
-      return RC::SCHEMA_TABLE_NOT_EXIST;
+      table = context_.find_outer_table(table_name);
+      if (nullptr == table) {
+        LOG_INFO("no such table in BinderContext: %s", table_name);
+        return RC::SCHEMA_TABLE_NOT_EXIST;
+      }
+      context_.add_used_outer_table(table);
+      /* LOG_INFO("no such table in from list: %s", table_name);
+       * return RC::SCHEMA_TABLE_NOT_EXIST; */
     }
   }
 
@@ -283,6 +304,7 @@ RC ExpressionBinder::bind_comparison_expression(
     right_expr.reset(right.release());
   }
 
+  child_bound_expressions.clear();
   bound_expressions.emplace_back(std::move(expr));
   return RC::SUCCESS;
 }
@@ -477,4 +499,17 @@ RC ExpressionBinder::bind_aggregate_expression(
 
   bound_expressions.emplace_back(std::move(aggregate_expr));
   return RC::SUCCESS;
+}
+
+RC ExpressionBinder::bind_subquery_expression(
+    unique_ptr<Expression> &subquery_expr, vector<unique_ptr<Expression>> &bound_expressions) {
+  RC rc = RC::SUCCESS;
+  auto expr = static_cast<SubQueryExpr*>(subquery_expr.get());
+  SubQueryExpr *ret = new SubQueryExpr{expr->sql_node().release()};
+  // if (OB_FAIL(rc = ret->build_select_stmt(context_.db(), context_.query_tables()))) {
+  if (OB_FAIL(rc = ret->build_select_stmt(context_))) {
+    return rc;
+  }
+  bound_expressions.emplace_back(ret); 
+  return rc;
 }

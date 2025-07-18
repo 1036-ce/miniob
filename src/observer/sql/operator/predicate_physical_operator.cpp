@@ -25,21 +25,45 @@ PredicatePhysicalOperator::PredicatePhysicalOperator(std::unique_ptr<Expression>
 
 RC PredicatePhysicalOperator::open(Trx *trx)
 {
-  if (children_.size() != 1) {
-    LOG_WARN("predicate operator must has one child");
-    return RC::INTERNAL;
+  ASSERT(children_.size() == 1, "predicate_physical_operator's children must have one child");
+  trx_  = trx;
+  RC rc = RC::SUCCESS;
+  if (OB_FAIL(rc = children_.front()->open(trx))) {
+    return rc;
   }
+  for (auto subquery : subqueries_) {
 
-  return children_[0]->open(trx);
+    TupleSchema schema;
+    if (OB_FAIL(rc = subquery->physical_oper()->tuple_schema(schema))) {
+      return rc;
+    }
+    if (schema.cell_num() != 1) {
+      LOG_WARN("subquery must return only one column");
+      return RC::INVALID_ARGUMENT;
+    }
+
+    if (!subquery->is_correlated()) {
+      if (OB_FAIL(rc = subquery->run_uncorrelated_query(trx))) {
+        return rc;
+      }
+      auto cmp_expr = find_subquery_parent(subquery);
+      // for '=', '>', '<', '>=', '<=', '!=', subquery must return one line
+      if (cmp_expr->comp() != CompOp::IN && cmp_expr->comp() != CompOp::NOT_IN && subquery->values().size() > 1) {
+        return RC::UNSUPPORTED;
+      }
+    }
+
+  }
+  return rc;
 }
 
 RC PredicatePhysicalOperator::next()
 {
-  RC                rc   = RC::SUCCESS;
-  PhysicalOperator *oper = children_.front().get();
+  RC                rc                 = RC::SUCCESS;
+  PhysicalOperator *non_subquery_child = children_.front().get();
 
-  while (RC::SUCCESS == (rc = oper->next())) {
-    Tuple *tuple = oper->current_tuple();
+  while (RC::SUCCESS == (rc = non_subquery_child->next())) {
+    Tuple *tuple = non_subquery_child->current_tuple();
     if (nullptr == tuple) {
       rc = RC::INTERNAL;
       LOG_WARN("failed to get tuple from operator");
@@ -47,8 +71,13 @@ RC PredicatePhysicalOperator::next()
     }
 
     Value value;
-    rc = expression_->get_value(*tuple, value);
-    if (rc != RC::SUCCESS) {
+    if (OB_FAIL(rc = open_correlated_subquery())) {
+      return rc;
+    }
+    if (OB_FAIL(rc = expression_->get_value(*tuple, value))) {
+      return rc;
+    }
+    if (OB_FAIL(close_correlated_subquery())) {
       return rc;
     }
 
@@ -61,13 +90,66 @@ RC PredicatePhysicalOperator::next()
 
 RC PredicatePhysicalOperator::close()
 {
-  children_[0]->close();
-  return RC::SUCCESS;
+  RC rc = children_.back()->close();
+  return rc;
 }
 
-Tuple *PredicatePhysicalOperator::current_tuple() { return children_[0]->current_tuple(); }
+Tuple *PredicatePhysicalOperator::current_tuple() { return children_.front()->current_tuple(); }
 
-RC PredicatePhysicalOperator::tuple_schema(TupleSchema &schema) const
+RC PredicatePhysicalOperator::tuple_schema(TupleSchema &schema) const { return children_.back()->tuple_schema(schema); }
+
+RC PredicatePhysicalOperator::open_correlated_subquery()
 {
-  return children_[0]->tuple_schema(schema);
+  RC rc = RC::SUCCESS;
+  for (auto subquery: subqueries_) {
+    if (subquery->is_correlated()) {
+      auto& physical_oper = subquery->physical_oper();
+      physical_oper->set_env_tuple(current_tuple());
+      if (OB_FAIL(rc = physical_oper->open(trx_))) {
+        return rc;
+      }
+    }
+  }
+  return rc;
+}
+
+RC PredicatePhysicalOperator::close_correlated_subquery()
+{
+  RC rc = RC::SUCCESS;
+  for (auto subquery: subqueries_) {
+    if (subquery->is_correlated()) {
+      auto& physical_oper = subquery->physical_oper();
+      physical_oper->set_env_tuple(nullptr);
+      if (OB_FAIL(rc = physical_oper->close())) {
+        return rc;
+      }
+    }
+  }
+  return rc;
+}
+
+ComparisonExpr *PredicatePhysicalOperator::find_subquery_parent(SubQueryExpr *subquery)
+{
+  queue<Expression *> expr_que;
+  expr_que.push(expression_.get());
+
+  while (!expr_que.empty()) {
+
+    Expression *cur = expr_que.front();
+    expr_que.pop();
+
+    if (cur->type() == ExprType::COMPARISON) {
+      ComparisonExpr *cmp_expr = static_cast<ComparisonExpr *>(cur);
+      if (cmp_expr->left().get() == subquery || cmp_expr->right().get() == subquery) {
+        return cmp_expr;
+      }
+    }
+
+    if (cur->type() == ExprType::CONJUNCTION) {
+      ConjunctionExpr *conj_expr = static_cast<ConjunctionExpr *>(cur);
+      expr_que.push(conj_expr->left().get());
+      expr_que.push(conj_expr->right().get());
+    }
+  }
+  return nullptr;
 }

@@ -38,6 +38,7 @@ enum class OpType
   LOGICALLIMIT,
   LOGICALANALYZE,
   LOGICALEXPLAIN,
+  LOGICALMOCK,
   // Separation of logical and physical operators
   LOGICALPHYSICALDELIMITER,
 
@@ -59,7 +60,8 @@ enum class OpType
   HASHGROUPBY,
   ANALYZE,
   FILTER,
-  SCALARGROUPBY
+  SCALARGROUPBY,
+  PHYSICALMOCK,
 };
 
 // TODO: OperatorNode is the abstrace class of logical/physical operator

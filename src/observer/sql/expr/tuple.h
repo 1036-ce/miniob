@@ -422,8 +422,8 @@ public:
   JoinedTuple()          = default;
   virtual ~JoinedTuple() = default;
 
-  void set_left(Tuple *left) { left_ = left; }
-  void set_right(Tuple *right) { right_ = right; }
+  void set_left(const Tuple *left) { left_ = left; }
+  void set_right(const Tuple *right) { right_ = right; }
 
   int cell_num() const override { return left_->cell_num() + right_->cell_num(); }
 
@@ -466,6 +466,6 @@ public:
   }
 
 private:
-  Tuple *left_  = nullptr;
-  Tuple *right_ = nullptr;
+  const Tuple *left_  = nullptr;
+  const Tuple *right_ = nullptr;
 };

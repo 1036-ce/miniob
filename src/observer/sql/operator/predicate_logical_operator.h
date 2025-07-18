@@ -15,19 +15,25 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include "sql/expr/expression.h"
+#include "sql/expr/subquery_expression.h"
 #include "sql/operator/logical_operator.h"
 
 /**
  * @brief 谓词/过滤逻辑算子
  * @ingroup LogicalOperator
+ *
  */
 class PredicateLogicalOperator : public LogicalOperator
 {
 public:
-  PredicateLogicalOperator(unique_ptr<Expression> expression);
+  PredicateLogicalOperator(unique_ptr<Expression> expression, std::vector<SubQueryExpr*> subqueries);
   virtual ~PredicateLogicalOperator() = default;
+
+  const std::vector<SubQueryExpr*>& subqueries() { return subqueries_; }
 
   LogicalOperatorType type() const override { return LogicalOperatorType::PREDICATE; }
 
   OpType get_op_type() const override { return OpType::LOGICALFILTER; }
+private:
+  std::vector<SubQueryExpr*> subqueries_;
 };

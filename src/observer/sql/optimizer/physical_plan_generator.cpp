@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/log/log.h"
 #include "sql/expr/expression.h"
 #include "session/session.h"
+#include "sql/expr/subquery_expression.h"
 #include "sql/operator/aggregate_vec_physical_operator.h"
 #include "sql/operator/calc_logical_operator.h"
 #include "sql/operator/calc_physical_operator.h"
@@ -29,6 +30,8 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/insert_logical_operator.h"
 #include "sql/operator/insert_physical_operator.h"
 #include "sql/operator/join_logical_operator.h"
+#include "sql/operator/mock_logical_operator.h"
+#include "sql/operator/mock_physical_operator.h"
 #include "sql/operator/nested_loop_join_physical_operator.h"
 #include "sql/operator/predicate_logical_operator.h"
 #include "sql/operator/predicate_physical_operator.h"
@@ -91,6 +94,10 @@ RC PhysicalPlanGenerator::create(
 
     case LogicalOperatorType::GROUP_BY: {
       return create_plan(static_cast<GroupByLogicalOperator &>(logical_operator), oper, session);
+    } break;
+
+    case LogicalOperatorType::MOCK: {
+      return create_plan(static_cast<MockLogicalOperator &>(logical_operator), oper, session);
     } break;
 
     default: {
@@ -236,26 +243,88 @@ RC PhysicalPlanGenerator::create_plan(
 RC PhysicalPlanGenerator::create_plan(
     PredicateLogicalOperator &pred_oper, unique_ptr<PhysicalOperator> &oper, Session *session)
 {
+  RC                                   rc             = RC::SUCCESS;
   vector<unique_ptr<LogicalOperator>> &children_opers = pred_oper.children();
-  ASSERT(children_opers.size() == 1, "predicate logical operator's sub oper number should be 1");
-
-  LogicalOperator &child_oper = *children_opers.front();
-
-  unique_ptr<PhysicalOperator> child_phy_oper;
-  RC                           rc = create(child_oper, child_phy_oper, session);
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to create child operator of predicate operator. rc=%s", strrc(rc));
-    return rc;
-  }
+  ASSERT(children_opers.size() >= 1, "predicate logical operator's sub oper number should be greater than or equal to 1");
 
   vector<unique_ptr<Expression>> &expressions = pred_oper.expressions();
   ASSERT(expressions.size() == 1, "predicate logical operator's children should be 1");
 
-  unique_ptr<Expression> expression = std::move(expressions.front());
-  oper = unique_ptr<PhysicalOperator>(new PredicatePhysicalOperator(std::move(expression)));
-  oper->add_child(std::move(child_phy_oper));
+  // collect all subquery expressions
+  /* vector<unique_ptr<Expression> *> subquey_exprs;
+   * auto                            &predicate = expressions.front();
+   * if (predicate->type() == ExprType::CONJUNCTION) {
+   *   auto conj_expr = static_cast<ConjunctionExpr *>(predicate.get());
+   *   subquey_exprs  = conj_expr->flatten(ExprType::SUBQUERY);
+   * } else if (predicate->type() == ExprType::COMPARISON) {
+   *   auto  comp_expr  = static_cast<ComparisonExpr *>(predicate.get());
+   *   auto &left_expr  = comp_expr->left();
+   *   auto &right_expr = comp_expr->right();
+   *   if (left_expr->type() == ExprType::SUBQUERY) {
+   *     subquey_exprs.push_back(&left_expr);
+   *   }
+   *   if (right_expr->type() == ExprType::SUBQUERY) {
+   *     subquey_exprs.push_back(&right_expr);
+   *   }
+   * } else {
+   *   LOG_ERROR("PredicateLogicalOperator's predicate's type must be CONJUNCTION or COMPARISON");
+   *   return RC::UNSUPPORTED;
+   * } */
+
+  const auto& subquey_exprs = pred_oper.subqueries();
+  auto& predicate = expressions.front();
+
+  // oper = unique_ptr<PhysicalOperator>(new PredicatePhysicalOperator(std::move(predicate)));
+  PredicatePhysicalOperator *pred_phy_oper = new PredicatePhysicalOperator(std::move(predicate));
+
+  // create all subquery operator
+  for (const auto &expr : subquey_exprs) {
+    // auto                         expr = static_cast<SubQueryExpr *>(subquey_expr->get());
+    unique_ptr<PhysicalOperator> phy_oper;
+    if (OB_FAIL(rc = create(*expr->logical_oper(), phy_oper, session))) {
+      LOG_ERROR("failed to create plan for a subquery. rc = %s", strrc(rc));
+      return rc;
+    }
+    expr->set_physical_oper(std::move(phy_oper));
+    pred_phy_oper->add_subquery(expr);
+    /* expr->set_physical_oper(phy_oper.get());
+     * pred_phy_oper->add_child(std::move(phy_oper)); */
+  }
+
+  unique_ptr<PhysicalOperator> phy_oper;
+  if (OB_FAIL(rc = create(*children_opers.back(), phy_oper, session))) {
+    LOG_ERROR("failed to create child operator of predicate operator. rc = %s", strrc(rc));
+    return rc;
+  }
+  pred_phy_oper->add_child(std::move(phy_oper));
+
+  oper = unique_ptr<PhysicalOperator>(pred_phy_oper);
   return rc;
 }
+
+/* RC PhysicalPlanGenerator::create_plan(
+ *     PredicateLogicalOperator &pred_oper, unique_ptr<PhysicalOperator> &oper, Session *session)
+ * {
+ *   vector<unique_ptr<LogicalOperator>> &children_opers = pred_oper.children();
+ *   ASSERT(children_opers.size() == 1, "predicate logical operator's sub oper number should be 1");
+ *
+ *   LogicalOperator &child_oper = *children_opers.front();
+ *
+ *   unique_ptr<PhysicalOperator> child_phy_oper;
+ *   RC                           rc = create(child_oper, child_phy_oper, session);
+ *   if (rc != RC::SUCCESS) {
+ *     LOG_WARN("failed to create child operator of predicate operator. rc=%s", strrc(rc));
+ *     return rc;
+ *   }
+ *
+ *   vector<unique_ptr<Expression>> &expressions = pred_oper.expressions();
+ *   ASSERT(expressions.size() == 1, "predicate logical operator's children should be 1");
+ *
+ *   unique_ptr<Expression> expression = std::move(expressions.front());
+ *   oper = unique_ptr<PhysicalOperator>(new PredicatePhysicalOperator(std::move(expression)));
+ *   oper->add_child(std::move(child_phy_oper));
+ *   return rc;
+ * } */
 
 RC PhysicalPlanGenerator::create_plan(
     ProjectLogicalOperator &project_oper, unique_ptr<PhysicalOperator> &oper, Session *session)
@@ -358,7 +427,7 @@ RC PhysicalPlanGenerator::create_plan(
   // if (session->hash_join_on() && can_use_hash_join(join_oper)) {
   if (can_use_hash_join(join_oper)) {
     LOG_TRACE("use hash join");
-    HashJoinPhysicalOperator* join_physical_oper = new HashJoinPhysicalOperator();
+    HashJoinPhysicalOperator *join_physical_oper = new HashJoinPhysicalOperator();
     for (auto &child_oper : child_opers) {
       unique_ptr<PhysicalOperator> child_physical_oper;
       rc = create(*child_oper, child_physical_oper, session);
@@ -369,13 +438,12 @@ RC PhysicalPlanGenerator::create_plan(
       join_physical_oper->add_child(std::move(child_physical_oper));
     }
 
-    auto& join_predicate = join_oper.join_predicate();
+    auto &join_predicate = join_oper.join_predicate();
     if (join_predicate->type() == ExprType::COMPARISON) {
-      auto comp_expr = static_cast<ComparisonExpr*>(join_predicate.get());
+      auto comp_expr = static_cast<ComparisonExpr *>(join_predicate.get());
       join_physical_oper->left_key_exprs().emplace_back(std::move(comp_expr->left()));
       join_physical_oper->right_key_exprs().emplace_back(std::move(comp_expr->right()));
-    }
-    else {
+    } else {
       delete join_physical_oper;
       return RC::UNIMPLEMENTED;
     }
@@ -383,7 +451,7 @@ RC PhysicalPlanGenerator::create_plan(
     oper.reset(join_physical_oper);
   } else {
     LOG_TRACE("use nlj join");
-    NestedLoopJoinPhysicalOperator* join_physical_oper = new NestedLoopJoinPhysicalOperator();
+    NestedLoopJoinPhysicalOperator *join_physical_oper = new NestedLoopJoinPhysicalOperator();
 
     for (auto &child_oper : child_opers) {
       unique_ptr<PhysicalOperator> child_physical_oper;
@@ -397,7 +465,7 @@ RC PhysicalPlanGenerator::create_plan(
     }
     if (join_oper.join_predicate()) {
       join_physical_oper->set_join_predicate(std::move(join_oper.join_predicate()));
-    } 
+    }
 
     oper.reset(join_physical_oper);
     // oper = std::move(join_physical_oper);
@@ -470,6 +538,11 @@ RC PhysicalPlanGenerator::create_plan(
 
   oper = std::move(group_by_oper);
   return rc;
+}
+
+RC PhysicalPlanGenerator::create_plan(MockLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper, Session *session) {
+  oper = unique_ptr<PhysicalOperator>(new MockPhysicalOperator());
+  return RC::SUCCESS;
 }
 
 RC PhysicalPlanGenerator::create_vec_plan(

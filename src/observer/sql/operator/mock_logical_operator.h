@@ -8,13 +8,19 @@ EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
 MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 See the Mulan PSL v2 for more details. */
 
-//
-// Created by Wangyunlai on 2022/12/13.
-//
+#pragma once
 
-#include "sql/operator/predicate_logical_operator.h"
+#include "sql/operator/logical_operator.h"
 
-PredicateLogicalOperator::PredicateLogicalOperator(unique_ptr<Expression> expression, std::vector<SubQueryExpr*> subqueries) {
-  expressions_.emplace_back(std::move(expression));
-  subqueries_ = subqueries;
-}
+class MockLogicalOperator : public LogicalOperator
+{
+public:
+  MockLogicalOperator() = default;
+
+  virtual ~MockLogicalOperator() = default;
+
+  LogicalOperatorType type() const override { return LogicalOperatorType::MOCK; }
+  OpType              get_op_type() const override { return OpType::LOGICALMOCK; }
+private:
+};
+

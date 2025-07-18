@@ -70,7 +70,14 @@ RC TableScanPhysicalOperator::close() {
 Tuple *TableScanPhysicalOperator::current_tuple()
 {
   tuple_.set_record(&current_record_);
-  return &tuple_;
+  if (env_tuple_ == nullptr) {
+    return &tuple_;
+  }
+  else {
+    joined_tuple_.set_left(&tuple_);
+    joined_tuple_.set_right(env_tuple_);
+    return &joined_tuple_;
+  }
 }
 
 string TableScanPhysicalOperator::param() const { return table_->name(); }

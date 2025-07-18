@@ -41,6 +41,7 @@ enum class LogicalOperatorType
   EXPLAIN,     ///< 查看执行计划
   GROUP_BY,    ///< 分组
   UPDATE,      ///< 更新
+  MOCK,        ///< 无任何输出，占位
 };
 
 /**

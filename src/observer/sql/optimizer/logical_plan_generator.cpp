@@ -16,6 +16,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "common/log/log.h"
 
+#include "sql/expr/subquery_expression.h"
 #include "sql/operator/calc_logical_operator.h"
 #include "sql/operator/delete_logical_operator.h"
 #include "sql/operator/explain_logical_operator.h"
@@ -108,24 +109,11 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     return rc;
   }
 
-  rc = create_plan(select_stmt->tables().get(), table_oper);
+  rc = create_plan(select_stmt->table_tree().get(), table_oper);
   if (OB_FAIL(rc)) {
     LOG_WARN("failed to create table logical plan. rc=%s", strrc(rc));
     return rc;
   }
-/*   const vector<Table *> &tables = select_stmt->tables();
- *   for (Table *table : tables) {
- * 
- *     unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_ONLY));
- *     if (table_oper == nullptr) {
- *       table_oper = std::move(table_get_oper);
- *     } else {
- *       JoinLogicalOperator *join_oper = new JoinLogicalOperator;
- *       join_oper->add_child(std::move(table_oper));
- *       join_oper->add_child(std::move(table_get_oper));
- *       table_oper = unique_ptr<LogicalOperator>(join_oper);
- *     }
- *   } */
 
   if (predicate_oper) {
     if (*last_oper) {
@@ -235,6 +223,10 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
     unique_ptr<Expression> &left  = cmp_expr->left();
     unique_ptr<Expression> &right = cmp_expr->right();
 
+    if (left->type() == ExprType::SUBQUERY || right->type() == ExprType::SUBQUERY) {
+      continue;
+    }
+
     if (left->value_type() != right->value_type()) {
       auto left_to_right_cost = implicit_cast_cost(left->value_type(), right->value_type());
       auto right_to_left_cost = implicit_cast_cost(right->value_type(), left->value_type());
@@ -254,7 +246,37 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
     }
   }
 
-  logical_operator = make_unique<PredicateLogicalOperator>(std::move(filter_stmt->predicate()));
+  // vector<unique_ptr<LogicalOperator>> children;
+  vector<SubQueryExpr*> subqueries;
+  for (unique_ptr<Expression> *expr : exprs) {
+    ASSERT((*expr)->type() == ExprType::COMPARISON, "Must be COMPARISON expression");
+    ComparisonExpr *cmp_expr = static_cast<ComparisonExpr *>(expr->get());
+
+    unique_ptr<Expression> &left  = cmp_expr->left();
+    unique_ptr<Expression> &right = cmp_expr->right();
+
+    if (left->type() ==  ExprType::SUBQUERY) {
+      SubQueryExpr* expr = static_cast<SubQueryExpr*>(left.get());
+      unique_ptr<LogicalOperator> logical_oper;
+      if (OB_FAIL(rc = create_plan(expr->select_stmt().get(), logical_oper))) {
+        return rc;
+      }
+      expr->set_logical_oper(std::move(logical_oper));
+      subqueries.push_back(expr);
+    }
+
+    if (right->type() == ExprType::SUBQUERY) {
+      SubQueryExpr* expr = static_cast<SubQueryExpr*>(right.get());
+      unique_ptr<LogicalOperator> logical_oper;
+      if (OB_FAIL(rc = create_plan(expr->select_stmt().get(), logical_oper))) {
+        return rc;
+      }
+      expr->set_logical_oper(std::move(logical_oper));
+      subqueries.push_back(expr);
+    }
+  }
+
+  logical_operator = make_unique<PredicateLogicalOperator>(std::move(filter_stmt->predicate()), subqueries);
   return rc;
 }
 

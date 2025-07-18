@@ -30,6 +30,7 @@ string physical_operator_type_name(PhysicalOperatorType type)
     case PhysicalOperatorType::STRING_LIST: return "STRING_LIST";
     case PhysicalOperatorType::HASH_GROUP_BY: return "HASH_GROUP_BY";
     case PhysicalOperatorType::SCALAR_GROUP_BY: return "SCALAR_GROUP_BY";
+    case PhysicalOperatorType::MOCK: return "MOCK";
     case PhysicalOperatorType::AGGREGATE_VEC: return "AGGREGATE_VEC";
     case PhysicalOperatorType::GROUP_BY_VEC: return "GROUP_BY_VEC";
     case PhysicalOperatorType::PROJECT_VEC: return "PROJECT_VEC";

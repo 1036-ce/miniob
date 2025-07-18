@@ -30,13 +30,17 @@ RC PredicatePushdownRewriter::rewrite(unique_ptr<LogicalOperator> &oper, bool &c
     return rc;
   }
 
+  auto pred_oper = static_cast<PredicateLogicalOperator*>(oper.get());
+  if (!pred_oper->subqueries().empty()) {
+    return rc;
+  }
+
   unique_ptr<LogicalOperator> &child_oper = oper->children().front();
   // if (child_oper->type() != LogicalOperatorType::TABLE_GET || child_oper->type() != LogicalOperatorType::JOIN)
   if (child_oper->type() != LogicalOperatorType::TABLE_GET) {
     return rc;
   }
 
-  auto pred_oper      = static_cast<PredicateLogicalOperator *>(oper.get());
   auto table_get_oper = static_cast<TableGetLogicalOperator *>(child_oper.get());
 
   if (pred_oper->expressions().size() != 1) {

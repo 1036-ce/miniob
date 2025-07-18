@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/expr/expression.h"
+#include "sql/expr/subquery_expression.h"
 #include "sql/expr/tuple.h"
 #include "sql/expr/arithmetic_operator.hpp"
 
@@ -29,6 +30,8 @@ string comp2str(CompOp comp)
     case CompOp::GREAT_THAN: return ">";
     case CompOp::IS: return "is";
     case CompOp::IS_NOT: return "is not";
+    case CompOp::IN: return "in";
+    case CompOp::NOT_IN: return "not in";
     default: return "";
   }
 }
@@ -217,6 +220,13 @@ RC ComparisonExpr::try_get_value(Value &cell) const
 
 RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
 {
+  if (comp_ == CompOp::IN) {
+    return comp_in_handler(tuple, value);
+  }
+  if (comp_ == CompOp::NOT_IN) {
+    return comp_notin_handler(tuple, value);
+  }
+
   Value left_value;
   Value right_value;
 
@@ -298,6 +308,73 @@ RC ComparisonExpr::related_tables(vector<const Table *> &tables) const
     return rc;
   }
   return right_->related_tables(tables);
+}
+
+RC ComparisonExpr::comp_in_handler(const Tuple &tuple, Value &value) const
+{
+  RC            rc            = RC::SUCCESS;
+  SubQueryExpr *subquyer_expr = static_cast<SubQueryExpr *>(right_.get());
+
+  Value left_value;
+  rc = left_->get_value(tuple, left_value);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  if (subquyer_expr->is_correlated()) {
+    // phy_oper has been opened
+    auto &phy_oper = subquyer_expr->physical_oper();
+    phy_oper->set_env_tuple(&tuple);
+
+    while (true) {
+      rc = phy_oper->next();
+      if (rc != RC::SUCCESS) {
+        if (rc == RC::RECORD_EOF) {
+          break;
+        }
+        return rc;
+      }
+
+      Tuple *subquery_tuple = phy_oper->current_tuple();
+      if (subquery_tuple->cell_num() > 1) {
+        LOG_ERROR("subquery's result must has only one column");
+        return RC::UNSUPPORTED;
+      }
+
+      Value right_value;
+      if (OB_FAIL(rc = subquery_tuple->cell_at(0, right_value))) {
+        return rc;
+      }
+
+      bool result = left_value.compare(right_value) == 0;
+      if (result) {
+        value.set_boolean(true);
+        return RC::SUCCESS;
+      }
+    }
+
+    value.set_boolean(false);
+    return rc == RC::RECORD_EOF ? RC::SUCCESS : rc;
+  }
+  else {
+    for (const auto& right_value: subquyer_expr->values()) {
+      bool result = left_value.compare(right_value) == 0;
+      if (result) {
+        value.set_boolean(true);
+        return RC::SUCCESS;
+      }
+    }
+    value.set_boolean(false);
+    return RC::SUCCESS;
+  }
+}
+
+RC ComparisonExpr::comp_notin_handler(const Tuple &tuple, Value &value) const
+{
+  RC rc = comp_in_handler(tuple, value);
+  value.set_boolean(!value.get_boolean());
+  return rc;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -388,8 +465,8 @@ auto ConjunctionExpr::flatten(ExprType type) -> vector<unique_ptr<Expression> *>
 
     if ((*expr)->type() == ExprType::COMPARISON) {
       auto                    comp_expr = static_cast<ComparisonExpr *>((*expr).get());
-      unique_ptr<Expression> *left             = &comp_expr->left();
-      unique_ptr<Expression> *right            = &comp_expr->right();
+      unique_ptr<Expression> *left      = &comp_expr->left();
+      unique_ptr<Expression> *right     = &comp_expr->right();
       que.push(left);
       que.push(right);
     } else if ((*expr)->type() == ExprType::CONJUNCTION) {
@@ -399,7 +476,8 @@ auto ConjunctionExpr::flatten(ExprType type) -> vector<unique_ptr<Expression> *>
       que.push(left);
       que.push(right);
     } else {
-      ASSERT(false, "Not Supported");
+      // ASSERT(false, "Not Supported");
+      continue;
     }
   }
   return ret;

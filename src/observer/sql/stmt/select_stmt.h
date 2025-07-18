@@ -36,7 +36,8 @@ class BoundSingleTable : public BoundTable
 public:
   BoundSingleTable(Table *table) : table_(table) {}
 
-  Table* table() const { return table_; }
+  Table *table() const { return table_; }
+
 private:
   Table *table_;
 };
@@ -53,10 +54,11 @@ public:
       : type_(type), expr_(std::move(expr)), left_(left), right_(right)
   {}
 
-  JoinType type() const { return type_; }
-  unique_ptr<Expression>& expr() { return expr_; }
-  unique_ptr<BoundTable>& left() { return left_; }
-  unique_ptr<BoundTable>& right() { return right_; }
+  JoinType                type() const { return type_; }
+  unique_ptr<Expression> &expr() { return expr_; }
+  unique_ptr<BoundTable> &left() { return left_; }
+  unique_ptr<BoundTable> &right() { return right_; }
+
 private:
   JoinType               type_;
   unique_ptr<Expression> expr_;
@@ -78,22 +80,30 @@ public:
 
 public:
   static RC create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt);
+  // for subquery
+  static RC create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const vector<Table *> &outer_tables);
+  static RC create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, BinderContext& binder_context);
 
 public:
-  const unique_ptr<BoundTable> &tables() const { return tables_; }
-  unique_ptr<BoundTable>       &tables() { return tables_; }
+  RC           query_tables(set<const Table *> &tables);
+  RC           related_tables(set<const Table *> &tables);
+  const Table *find_table();
+
+  const unique_ptr<BoundTable> &table_tree() const { return table_tree_; }
+  unique_ptr<BoundTable>       &table_tree() { return table_tree_; }
   FilterStmt                   *filter_stmt() const { return filter_stmt_; }
 
   vector<unique_ptr<Expression>> &query_expressions() { return query_expressions_; }
   vector<unique_ptr<Expression>> &group_by() { return group_by_; }
 
 private:
-  static auto collect_tables(Db *db, UnboundTable *table_ref, unordered_map<string, Table *> &table_map, BinderContext& binder_context) -> RC;
-  static auto bind_tables(
-      const unordered_map<string, Table *> &table_map, ExpressionBinder& expr_binder, UnboundTable *unbound_table) -> unique_ptr<BoundTable>;
+  static auto collect_tables(
+      Db *db, UnboundTable *table_ref, unordered_map<string, Table *> &table_map, BinderContext &binder_context) -> RC;
+  static auto bind_tables(const unordered_map<string, Table *> &table_map, ExpressionBinder &expr_binder,
+      UnboundTable *unbound_table) -> unique_ptr<BoundTable>;
 
   vector<unique_ptr<Expression>> query_expressions_;
-  unique_ptr<BoundTable>         tables_;
+  unique_ptr<BoundTable>         table_tree_;
   FilterStmt                    *filter_stmt_ = nullptr;
   vector<unique_ptr<Expression>> group_by_;
 };
