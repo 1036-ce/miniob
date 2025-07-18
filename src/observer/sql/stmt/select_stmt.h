@@ -81,14 +81,9 @@ public:
 public:
   static RC create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt);
   // for subquery
-  static RC create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const vector<Table *> &outer_tables);
   static RC create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, BinderContext& binder_context);
 
 public:
-  RC           query_tables(set<const Table *> &tables);
-  RC           related_tables(set<const Table *> &tables);
-  const Table *find_table();
-
   const unique_ptr<BoundTable> &table_tree() const { return table_tree_; }
   unique_ptr<BoundTable>       &table_tree() { return table_tree_; }
   FilterStmt                   *filter_stmt() const { return filter_stmt_; }

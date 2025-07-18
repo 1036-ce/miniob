@@ -338,7 +338,7 @@ RC ComparisonExpr::comp_in_handler(const Tuple &tuple, Value &value) const
 
       Tuple *subquery_tuple = phy_oper->current_tuple();
       if (subquery_tuple->cell_num() > 1) {
-        LOG_ERROR("subquery's result must has only one column");
+        LOG_WARN("subquery's result must has only one column");
         return RC::UNSUPPORTED;
       }
 

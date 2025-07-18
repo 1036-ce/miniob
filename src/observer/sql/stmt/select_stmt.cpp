@@ -98,78 +98,9 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
 }
 
 // for subquery
-RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const vector<Table *> &outer_tables)
-{
-  if (nullptr == db) {
-    LOG_WARN("invalid argument. db is null");
-    return RC::INVALID_ARGUMENT;
-  }
-
-  RC            rc = RC::SUCCESS;
-  BinderContext binder_context;
-  unordered_map<string, Table *> table_map;
-
-  binder_context.set_db(db);
-  for (const auto &table : outer_tables) {
-    binder_context.add_table(table);
-    table_map.insert({table->name(), table});
-  }
-
-  // collect tables in `from` statement
-  if (OB_FAIL(rc = collect_tables(db, select_sql.table_refs.get(), table_map, binder_context))) {
-    return rc;
-  }
-  /* for (auto& [_, table]: table_map) {
-   *   binder_context.add_table(table);
-   * } */
-
-  // collect query fields in `select` statement
-  vector<unique_ptr<Expression>> bound_expressions;
-  ExpressionBinder               expression_binder(binder_context);
-
-  unique_ptr<BoundTable> tables = bind_tables(table_map, expression_binder, select_sql.table_refs.get());
-
-  for (unique_ptr<Expression> &expression : select_sql.expressions) {
-    rc = expression_binder.bind_expression(expression, bound_expressions);
-    if (OB_FAIL(rc)) {
-      LOG_INFO("bind expression failed. rc=%s", strrc(rc));
-      return rc;
-    }
-  }
-
-  vector<unique_ptr<Expression>> group_by_expressions;
-  for (unique_ptr<Expression> &expression : select_sql.group_by) {
-    RC rc = expression_binder.bind_expression(expression, group_by_expressions);
-    if (OB_FAIL(rc)) {
-      LOG_INFO("bind expression failed. rc=%s", strrc(rc));
-      return rc;
-    }
-  }
-
-  /* Table *default_table = nullptr;
-   * if (table_map.size() == 1) {
-   *   default_table = table_map.begin()->second;
-   * } */
-
-  // create filter statement in `where` statement
-  FilterStmt *filter_stmt = nullptr;
-  // rc = FilterStmt::create(db, default_table, &table_map, std::move(select_sql.condition), filter_stmt);
-  rc = FilterStmt::create(db, binder_context, std::move(select_sql.condition), filter_stmt);
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("cannot construct filter stmt");
-    return rc;
-  }
-
-  // everything alright
-  SelectStmt *select_stmt = new SelectStmt();
-
-  select_stmt->table_tree_.reset(tables.release());
-  select_stmt->query_expressions_.swap(bound_expressions);
-  select_stmt->filter_stmt_ = filter_stmt;
-  select_stmt->group_by_.swap(group_by_expressions);
-  stmt = select_stmt;
-  return RC::SUCCESS;
-}
+/* RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const vector<Table *> &outer_tables)
+ * {
+ * } */
 
 RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, BinderContext& binder_context) {
   if (nullptr == db) {
@@ -226,58 +157,6 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, BinderCont
   select_stmt->group_by_.swap(group_by_expressions);
   stmt = select_stmt;
   return RC::SUCCESS;
-}
-
-RC SelectStmt::query_tables(set<const Table *> &tables) {
-  queue<BoundTable *> que;
-  que.push(table_tree_.get());
-
-  while (!que.empty()) {
-    BoundTable *cur = que.front();
-    que.pop();
-
-    if (BoundSingleTable *single_table = dynamic_cast<BoundSingleTable *>(cur); single_table != nullptr) {
-      tables.insert(single_table->table());
-    } else if (BoundJoinedTable *joined_table = dynamic_cast<BoundJoinedTable *>(cur); joined_table != nullptr) {
-      que.push(joined_table->left().get());
-      que.push(joined_table->right().get());
-    }
-  }
-  return RC::SUCCESS;
-}
-
-RC SelectStmt::related_tables(set<const Table *> &tables) {
-  RC rc = RC::SUCCESS;
-  if (OB_FAIL(rc = query_tables(tables))) {
-    return rc;
-  }
-  if (filter_stmt_) {
-    vector<const Table*> pred_tables;
-    filter_stmt_->predicate()->related_tables(pred_tables);
-    for (auto table: pred_tables) {
-      tables.insert(table);
-    }
-  }
-  return RC::SUCCESS;
-}
-
-const Table *SelectStmt::find_table()
-{
-  queue<BoundTable *> que;
-  que.push(table_tree_.get());
-
-  while (!que.empty()) {
-    BoundTable *cur = que.front();
-    que.pop();
-
-    if (BoundSingleTable *single_table = dynamic_cast<BoundSingleTable *>(cur); single_table != nullptr) {
-      return single_table->table();
-    } else if (BoundJoinedTable *joined_table = dynamic_cast<BoundJoinedTable *>(cur); joined_table != nullptr) {
-      que.push(joined_table->left().get());
-      que.push(joined_table->right().get());
-    }
-  }
-  return nullptr;
 }
 
 auto SelectStmt::collect_tables(

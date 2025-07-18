@@ -184,7 +184,11 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
     return RC::SUCCESS;
   }
 
-  auto comparable_expr = [](unique_ptr<Expression> &expr, AttrType target_type) -> RC {
+  RC                               rc = RC::SUCCESS;
+  vector<SubQueryExpr *>           subqueries;
+  vector<unique_ptr<Expression> *> exprs;
+
+  auto make_comparable_expr = [](unique_ptr<Expression> &expr, AttrType target_type) -> RC {
     RC       rc        = RC::SUCCESS;
     ExprType type      = expr->type();
     auto     cast_expr = make_unique<CastExpr>(std::move(expr), target_type);
@@ -201,17 +205,24 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
     return RC::SUCCESS;
   };
 
-  vector<unique_ptr<Expression> *> exprs;
-  RC               rc               = RC::SUCCESS;
+  auto subquery_handle = [&](unique_ptr<Expression> &subquery_expr) -> RC {
+    SubQueryExpr               *expr = static_cast<SubQueryExpr *>(subquery_expr.get());
+    unique_ptr<LogicalOperator> logical_oper;
+    if (OB_FAIL(rc = create_plan(expr->select_stmt().get(), logical_oper))) {
+      return rc;
+    }
+    expr->set_logical_oper(std::move(logical_oper));
+    subqueries.push_back(expr);
+    return RC::SUCCESS;
+  };
 
+  // collect all ComparisonExpr
   if (filter_stmt->predicate()->type() == ExprType::CONJUNCTION) {
     ConjunctionExpr *conjunction_expr = static_cast<ConjunctionExpr *>(filter_stmt->predicate().get());
-    exprs = conjunction_expr->flatten(ExprType::COMPARISON);
-  }
-  else if (filter_stmt->predicate()->type() == ExprType::COMPARISON) {
+    exprs                             = conjunction_expr->flatten(ExprType::COMPARISON);
+  } else if (filter_stmt->predicate()->type() == ExprType::COMPARISON) {
     exprs.push_back(&filter_stmt->predicate());
-  }
-  else {
+  } else {
     LOG_WARN("Predicate must be COMPARISON or CONJUNCTION");
     return RC::UNSUPPORTED;
   }
@@ -224,6 +235,16 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
     unique_ptr<Expression> &right = cmp_expr->right();
 
     if (left->type() == ExprType::SUBQUERY || right->type() == ExprType::SUBQUERY) {
+      if (left->type() == ExprType::SUBQUERY) {
+        if (OB_FAIL(rc = subquery_handle(left))) {
+          return rc;
+        }
+      }
+      if (right->type() == ExprType::SUBQUERY) {
+        if (OB_FAIL(rc = subquery_handle(right))) {
+          return rc;
+        }
+      }
       continue;
     }
 
@@ -231,11 +252,11 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
       auto left_to_right_cost = implicit_cast_cost(left->value_type(), right->value_type());
       auto right_to_left_cost = implicit_cast_cost(right->value_type(), left->value_type());
       if (left_to_right_cost <= right_to_left_cost && left_to_right_cost != INT32_MAX) {
-        if (OB_FAIL(rc = comparable_expr(left, right->value_type()))) {
+        if (OB_FAIL(rc = make_comparable_expr(left, right->value_type()))) {
           return rc;
         }
       } else if (right_to_left_cost < left_to_right_cost && right_to_left_cost != INT32_MAX) {
-        if (OB_FAIL(rc = comparable_expr(right, left->value_type()))) {
+        if (OB_FAIL(rc = make_comparable_expr(right, left->value_type()))) {
           return rc;
         }
       } else {
@@ -246,108 +267,9 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
     }
   }
 
-  // vector<unique_ptr<LogicalOperator>> children;
-  vector<SubQueryExpr*> subqueries;
-  for (unique_ptr<Expression> *expr : exprs) {
-    ASSERT((*expr)->type() == ExprType::COMPARISON, "Must be COMPARISON expression");
-    ComparisonExpr *cmp_expr = static_cast<ComparisonExpr *>(expr->get());
-
-    unique_ptr<Expression> &left  = cmp_expr->left();
-    unique_ptr<Expression> &right = cmp_expr->right();
-
-    if (left->type() ==  ExprType::SUBQUERY) {
-      SubQueryExpr* expr = static_cast<SubQueryExpr*>(left.get());
-      unique_ptr<LogicalOperator> logical_oper;
-      if (OB_FAIL(rc = create_plan(expr->select_stmt().get(), logical_oper))) {
-        return rc;
-      }
-      expr->set_logical_oper(std::move(logical_oper));
-      subqueries.push_back(expr);
-    }
-
-    if (right->type() == ExprType::SUBQUERY) {
-      SubQueryExpr* expr = static_cast<SubQueryExpr*>(right.get());
-      unique_ptr<LogicalOperator> logical_oper;
-      if (OB_FAIL(rc = create_plan(expr->select_stmt().get(), logical_oper))) {
-        return rc;
-      }
-      expr->set_logical_oper(std::move(logical_oper));
-      subqueries.push_back(expr);
-    }
-  }
-
   logical_operator = make_unique<PredicateLogicalOperator>(std::move(filter_stmt->predicate()), subqueries);
   return rc;
 }
-
-/* RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<LogicalOperator> &logical_operator)
- * {
- *   RC                             rc = RC::SUCCESS;
- *   vector<unique_ptr<Expression>> cmp_exprs;
- *   const vector<FilterUnit *>    &filter_units = filter_stmt->filter_units();
- *   for (const FilterUnit *filter_unit : filter_units) {
- *     const FilterObj &filter_obj_left  = filter_unit->left();
- *     const FilterObj &filter_obj_right = filter_unit->right();
- * 
- *     unique_ptr<Expression> left(filter_obj_left.is_attr
- *                                     ? static_cast<Expression *>(new FieldExpr(filter_obj_left.field))
- *                                     : static_cast<Expression *>(new ValueExpr(filter_obj_left.value)));
- * 
- *     unique_ptr<Expression> right(filter_obj_right.is_attr
- *                                      ? static_cast<Expression *>(new FieldExpr(filter_obj_right.field))
- *                                      : static_cast<Expression *>(new ValueExpr(filter_obj_right.value)));
- * 
- *     if (left->value_type() != right->value_type()) {
- *       auto left_to_right_cost = implicit_cast_cost(left->value_type(), right->value_type());
- *       auto right_to_left_cost = implicit_cast_cost(right->value_type(), left->value_type());
- *       if (left_to_right_cost <= right_to_left_cost && left_to_right_cost != INT32_MAX) {
- *         ExprType left_type = left->type();
- *         auto     cast_expr = make_unique<CastExpr>(std::move(left), right->value_type());
- *         if (left_type == ExprType::VALUE) {
- *           Value left_val;
- *           if (OB_FAIL(rc = cast_expr->try_get_value(left_val))) {
- *             LOG_WARN("failed to get value from left child", strrc(rc));
- *             return rc;
- *           }
- *           left = make_unique<ValueExpr>(left_val);
- *         } else {
- *           left = std::move(cast_expr);
- *         }
- *       } else if (right_to_left_cost < left_to_right_cost && right_to_left_cost != INT32_MAX) {
- *         ExprType right_type = right->type();
- *         auto     cast_expr  = make_unique<CastExpr>(std::move(right), left->value_type());
- *         if (right_type == ExprType::VALUE) {
- *           Value right_val;
- *           if (OB_FAIL(rc = cast_expr->try_get_value(right_val))) {
- *             LOG_WARN("failed to get value from right child", strrc(rc));
- *             return rc;
- *           }
- *           right = make_unique<ValueExpr>(right_val);
- *         } else {
- *           right = std::move(cast_expr);
- *         }
- * 
- *       } else {
- *         rc = RC::UNSUPPORTED;
- *         LOG_WARN("unsupported cast from %s to %s", attr_type_to_string(left->value_type()),
- * attr_type_to_string(right->value_type()));
- *         return rc;
- *       }
- *     }
- * 
- *     ComparisonExpr *cmp_expr = new ComparisonExpr(filter_unit->comp(), std::move(left), std::move(right));
- *     cmp_exprs.emplace_back(cmp_expr);
- *   }
- * 
- *   unique_ptr<PredicateLogicalOperator> predicate_oper = make_unique<PredicateLogicalOperator>(std::move(filter_stmt.));
- *   if (!cmp_exprs.empty()) {
- *     unique_ptr<ConjunctionExpr> conjunction_expr(new ConjunctionExpr(ConjunctionExpr::Type::AND, cmp_exprs));
- *     predicate_oper = unique_ptr<PredicateLogicalOperator>(new PredicateLogicalOperator(std::move(conjunction_expr)));
- *   }
- * 
- *   logical_operator = std::move(predicate_oper);
- *   return rc;
- * } */
 
 int LogicalPlanGenerator::implicit_cast_cost(AttrType from, AttrType to)
 {
@@ -410,16 +332,18 @@ RC LogicalPlanGenerator::create_plan(ExplainStmt *explain_stmt, unique_ptr<Logic
   return rc;
 }
 
-RC LogicalPlanGenerator::create_plan(BoundTable *bound_table, unique_ptr<LogicalOperator> &logical_operator) {
+RC LogicalPlanGenerator::create_plan(BoundTable *bound_table, unique_ptr<LogicalOperator> &logical_operator)
+{
   if (BoundSingleTable *single_table = dynamic_cast<BoundSingleTable *>(bound_table); single_table != nullptr) {
-    unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(single_table->table(), ReadWriteMode::READ_ONLY));
+    unique_ptr<LogicalOperator> table_get_oper(
+        new TableGetLogicalOperator(single_table->table(), ReadWriteMode::READ_ONLY));
     logical_operator = std::move(table_get_oper);
     return RC::SUCCESS;
   }
 
-  if (BoundJoinedTable* joined_table = dynamic_cast<BoundJoinedTable*>(bound_table); joined_table != nullptr) {
-    RC rc = RC::SUCCESS;
-    auto left = joined_table->left().get();
+  if (BoundJoinedTable *joined_table = dynamic_cast<BoundJoinedTable *>(bound_table); joined_table != nullptr) {
+    RC   rc    = RC::SUCCESS;
+    auto left  = joined_table->left().get();
     auto right = joined_table->right().get();
 
     unique_ptr<LogicalOperator> left_oper, right_oper;

@@ -250,45 +250,20 @@ RC PhysicalPlanGenerator::create_plan(
   vector<unique_ptr<Expression>> &expressions = pred_oper.expressions();
   ASSERT(expressions.size() == 1, "predicate logical operator's children should be 1");
 
-  // collect all subquery expressions
-  /* vector<unique_ptr<Expression> *> subquey_exprs;
-   * auto                            &predicate = expressions.front();
-   * if (predicate->type() == ExprType::CONJUNCTION) {
-   *   auto conj_expr = static_cast<ConjunctionExpr *>(predicate.get());
-   *   subquey_exprs  = conj_expr->flatten(ExprType::SUBQUERY);
-   * } else if (predicate->type() == ExprType::COMPARISON) {
-   *   auto  comp_expr  = static_cast<ComparisonExpr *>(predicate.get());
-   *   auto &left_expr  = comp_expr->left();
-   *   auto &right_expr = comp_expr->right();
-   *   if (left_expr->type() == ExprType::SUBQUERY) {
-   *     subquey_exprs.push_back(&left_expr);
-   *   }
-   *   if (right_expr->type() == ExprType::SUBQUERY) {
-   *     subquey_exprs.push_back(&right_expr);
-   *   }
-   * } else {
-   *   LOG_ERROR("PredicateLogicalOperator's predicate's type must be CONJUNCTION or COMPARISON");
-   *   return RC::UNSUPPORTED;
-   * } */
-
   const auto& subquey_exprs = pred_oper.subqueries();
   auto& predicate = expressions.front();
 
-  // oper = unique_ptr<PhysicalOperator>(new PredicatePhysicalOperator(std::move(predicate)));
   PredicatePhysicalOperator *pred_phy_oper = new PredicatePhysicalOperator(std::move(predicate));
 
   // create all subquery operator
   for (const auto &expr : subquey_exprs) {
-    // auto                         expr = static_cast<SubQueryExpr *>(subquey_expr->get());
     unique_ptr<PhysicalOperator> phy_oper;
     if (OB_FAIL(rc = create(*expr->logical_oper(), phy_oper, session))) {
-      LOG_ERROR("failed to create plan for a subquery. rc = %s", strrc(rc));
+      LOG_WARN("failed to create plan for a subquery. rc = %s", strrc(rc));
       return rc;
     }
     expr->set_physical_oper(std::move(phy_oper));
     pred_phy_oper->add_subquery(expr);
-    /* expr->set_physical_oper(phy_oper.get());
-     * pred_phy_oper->add_child(std::move(phy_oper)); */
   }
 
   unique_ptr<PhysicalOperator> phy_oper;
@@ -301,30 +276,6 @@ RC PhysicalPlanGenerator::create_plan(
   oper = unique_ptr<PhysicalOperator>(pred_phy_oper);
   return rc;
 }
-
-/* RC PhysicalPlanGenerator::create_plan(
- *     PredicateLogicalOperator &pred_oper, unique_ptr<PhysicalOperator> &oper, Session *session)
- * {
- *   vector<unique_ptr<LogicalOperator>> &children_opers = pred_oper.children();
- *   ASSERT(children_opers.size() == 1, "predicate logical operator's sub oper number should be 1");
- *
- *   LogicalOperator &child_oper = *children_opers.front();
- *
- *   unique_ptr<PhysicalOperator> child_phy_oper;
- *   RC                           rc = create(child_oper, child_phy_oper, session);
- *   if (rc != RC::SUCCESS) {
- *     LOG_WARN("failed to create child operator of predicate operator. rc=%s", strrc(rc));
- *     return rc;
- *   }
- *
- *   vector<unique_ptr<Expression>> &expressions = pred_oper.expressions();
- *   ASSERT(expressions.size() == 1, "predicate logical operator's children should be 1");
- *
- *   unique_ptr<Expression> expression = std::move(expressions.front());
- *   oper = unique_ptr<PhysicalOperator>(new PredicatePhysicalOperator(std::move(expression)));
- *   oper->add_child(std::move(child_phy_oper));
- *   return rc;
- * } */
 
 RC PhysicalPlanGenerator::create_plan(
     ProjectLogicalOperator &project_oper, unique_ptr<PhysicalOperator> &oper, Session *session)

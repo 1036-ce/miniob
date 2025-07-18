@@ -1,22 +1,11 @@
 #include "sql/expr/subquery_expression.h"
 #include "sql/optimizer/logical_plan_generator.h"
 
-// RC SubQueryExpr::build_select_stmt(Db *db, const vector<Table *> &tables)
 RC SubQueryExpr::build_select_stmt(BinderContext& binder_context)
 {
   RC    rc   = RC::SUCCESS;
   Stmt *stmt = nullptr;
 
-  /* if (OB_FAIL(rc = SelectStmt::create(db, sql_node_->selection, stmt, tables))) {
-   *   return rc;
-   * } */
-  /* BinderContext binder_context;
-   * binder_context.set_db(db);
-   * for (auto table: tables) {
-   *   if (binder_context.find_outer_table(table->name()) != nullptr) {
-   *     binder_context.add_outer_table(table);
-   *   }
-   * } */
   BinderContext sub_binder_context;
   sub_binder_context.set_db(binder_context.db());
   for (auto table: binder_context.outer_query_tables()) {
@@ -81,15 +70,7 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
 }
 
 RC SubQueryExpr::related_tables(vector<const Table *> &tables) const {
-  RC rc = RC::SUCCESS;
-  set<const Table*> stmt_tables;
-  if (OB_FAIL(rc = select_stmt_->related_tables(stmt_tables))) {
-    return rc;
-  }
-  for (auto table: stmt_tables) {
-    tables.push_back(table);
-  }
-  return rc;
+  return RC::UNIMPLEMENTED;
 }
 
 RC SubQueryExpr::run_uncorrelated_query(Trx *trx)
