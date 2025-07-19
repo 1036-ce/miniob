@@ -19,15 +19,15 @@ insert into t_order_by_2 values(3, 40);
 insert into t_order_by_2 values(4, 20);
 
 -- echo 3. primary order by
--- sort select * from t_order_by order by id;
+select * from t_order_by order by id;
 
--- sort select * from t_order_by order by id asc;
+select * from t_order_by order by id asc;
 
--- sort select * from t_order_by order by id desc;
+select * from t_order_by order by id desc;
 
--- sort select * from t_order_by order by score desc;
+select * from t_order_by order by score desc;
 
--- sort select * from t_order_by order by name desc;
+select * from t_order_by order by name desc;
 
 -- echo 4. order by more than one fields
 select * from t_order_by order by id, score, name;

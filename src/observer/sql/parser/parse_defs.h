@@ -106,6 +106,11 @@ struct UnboundJoinedTable : public UnboundTable {
   unique_ptr<UnboundTable> right;
 };
 
+struct OrderBy {
+  bool is_asc;
+  unique_ptr<Expression> expr;
+};
+
 /**
  * @brief 描述一个select语句
  * @ingroup SQLParser
@@ -123,6 +128,7 @@ struct SelectSqlNode
   unique_ptr<UnboundTable>       table_refs;
   vector<unique_ptr<Expression>> group_by;     ///< group by clause
   unique_ptr<Expression>         condition;    ///< 查询条件
+  vector<unique_ptr<OrderBy>>    order_by;
 };
 
 /**

@@ -85,6 +85,7 @@ QUOTE            [\'\"]
 {DOT}                                   RETURN_TOKEN(DOT);
 EXIT                                    RETURN_TOKEN(EXIT);
 HELP                                    RETURN_TOKEN(HELP);
+ASC                                     RETURN_TOKEN(ASC);
 DESC                                    RETURN_TOKEN(DESC);
 CREATE                                  RETURN_TOKEN(CREATE);
 DROP                                    RETURN_TOKEN(DROP);
@@ -131,6 +132,7 @@ IS                                      RETURN_TOKEN(IS_T);
 INNER                                   RETURN_TOKEN(INNER_T);
 JOIN                                    RETURN_TOKEN(JOIN_T);
 IN                                      RETURN_TOKEN(IN_T);
+ORDER                                   RETURN_TOKEN(ORDER_T);
 {ID}                                    yylval->cstring=strdup(yytext); static_cast<std::vector<char*>*>(yyextra)->push_back(yylval->cstring); RETURN_TOKEN(ID);
 "("                                     RETURN_TOKEN(LBRACE);
 ")"                                     RETURN_TOKEN(RBRACE);

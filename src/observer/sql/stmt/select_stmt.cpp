@@ -46,9 +46,6 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   if (OB_FAIL(rc = collect_tables(db, select_sql.table_refs.get(), table_map, binder_context))) {
     return rc;
   }
-  /* for (auto& [_, table]: table_map) {
-   *   binder_context.add_table(table);
-   * } */
 
   // collect query fields in `select` statement
   vector<unique_ptr<Expression>> bound_expressions;
@@ -64,6 +61,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     }
   }
 
+  // create groupby clause
   vector<unique_ptr<Expression>> group_by_expressions;
   for (unique_ptr<Expression> &expression : select_sql.group_by) {
     RC rc = expression_binder.bind_expression(expression, group_by_expressions);
@@ -72,6 +70,24 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       return rc;
     }
   }
+
+  // create orderby clause
+  vector<unique_ptr<Expression>> orderby_expressions;
+  vector<unique_ptr<OrderBy>> orderby;
+  for (auto& orderby_entry: select_sql.order_by) {
+    RC rc = expression_binder.bind_expression(orderby_entry->expr, orderby_expressions);
+    if (OB_FAIL(rc)) {
+      LOG_INFO("bind expression failed. rc=%s", strrc(rc));
+      return rc;
+    }
+    ASSERT(orderby_expressions.size() == 1, "bound orderby expressions' size must equal to 1");
+    OrderBy* new_orderby_entry = new OrderBy;
+    new_orderby_entry->is_asc = orderby_entry->is_asc;
+    new_orderby_entry->expr.reset(orderby_expressions.front().release());
+    orderby.emplace_back(new_orderby_entry);
+    orderby_expressions.clear();
+  }
+
 
   Table *default_table = nullptr;
   if (table_map.size() == 1) {
@@ -85,7 +101,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     LOG_WARN("cannot construct filter stmt");
     return rc;
   }
-
+  
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
 
@@ -93,14 +109,10 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   select_stmt->query_expressions_.swap(bound_expressions);
   select_stmt->filter_stmt_ = filter_stmt;
   select_stmt->group_by_.swap(group_by_expressions);
+  select_stmt->order_by_.swap(orderby);
   stmt = select_stmt;
   return RC::SUCCESS;
 }
-
-// for subquery
-/* RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, const vector<Table *> &outer_tables)
- * {
- * } */
 
 RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, BinderContext& binder_context) {
   if (nullptr == db) {
@@ -130,6 +142,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, BinderCont
     }
   }
 
+  // create groupby clause
   vector<unique_ptr<Expression>> group_by_expressions;
   for (unique_ptr<Expression> &expression : select_sql.group_by) {
     RC rc = expression_binder.bind_expression(expression, group_by_expressions);
@@ -139,9 +152,24 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, BinderCont
     }
   }
 
-  // create filter statement in `where` statement
+  // create orderby clause
+  vector<unique_ptr<Expression>> orderby_expressions;
+  vector<unique_ptr<OrderBy>> orderby;
+  for (auto& orderby_entry: select_sql.order_by) {
+    RC rc = expression_binder.bind_expression(orderby_entry->expr, orderby_expressions);
+    if (OB_FAIL(rc)) {
+      LOG_INFO("bind expression failed. rc=%s", strrc(rc));
+      return rc;
+    }
+    ASSERT(orderby_expressions.size() == 1, "bound orderby expressions' size must equal to 1");
+    OrderBy* new_orderby_entry = new OrderBy;
+    new_orderby_entry->is_asc = orderby_entry->is_asc;
+    new_orderby_entry->expr.reset(orderby_expressions.front().release());
+    orderby.emplace_back(new_orderby_entry);
+  }
+
+  // create filter statement in `where` clause 
   FilterStmt *filter_stmt = nullptr;
-  // rc = FilterStmt::create(db, default_table, &table_map, std::move(select_sql.condition), filter_stmt);
   rc = FilterStmt::create(db, binder_context, std::move(select_sql.condition), filter_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");
@@ -155,6 +183,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, BinderCont
   select_stmt->query_expressions_.swap(bound_expressions);
   select_stmt->filter_stmt_ = filter_stmt;
   select_stmt->group_by_.swap(group_by_expressions);
+  select_stmt->order_by_.swap(orderby);
   stmt = select_stmt;
   return RC::SUCCESS;
 }

@@ -90,6 +90,7 @@ public:
 
   vector<unique_ptr<Expression>> &query_expressions() { return query_expressions_; }
   vector<unique_ptr<Expression>> &group_by() { return group_by_; }
+  vector<unique_ptr<OrderBy>>    &order_by() { return order_by_; }
 
 private:
   static auto collect_tables(
@@ -101,4 +102,5 @@ private:
   unique_ptr<BoundTable>         table_tree_;
   FilterStmt                    *filter_stmt_ = nullptr;
   vector<unique_ptr<Expression>> group_by_;
+  vector<unique_ptr<OrderBy>>    order_by_;
 };

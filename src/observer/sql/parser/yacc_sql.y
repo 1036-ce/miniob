@@ -80,6 +80,7 @@ SubQueryExpr *create_subquery_expression(ParsedSqlNode* sql_node, const char *sq
         CALC
         SELECT
         DESC
+        ASC
         SHOW
         SYNC
         INSERT
@@ -122,6 +123,7 @@ SubQueryExpr *create_subquery_expression(ParsedSqlNode* sql_node, const char *sq
         INNER_T
         JOIN_T
         IN_T
+        ORDER_T
         EQ
         LT
         GT
@@ -140,10 +142,12 @@ SubQueryExpr *create_subquery_expression(ParsedSqlNode* sql_node, const char *sq
   Expression *                               expression;
   vector<unique_ptr<Expression>> *           expression_list;
   vector<RelAttrSqlNode> *                   rel_attr_list;
-  UnboundTable*                                  table_ref;
+  UnboundTable*                              table_ref;
   vector<string> *                           key_list;
   Assignment *                               assignment;
   std::vector<unique_ptr<Assignment>> *      assignment_list;
+  OrderBy*                                   order_by_entry;
+  vector<unique_ptr<OrderBy>>*               order_by_list;
   char *                                     cstring;
   int                                        number;
   float                                      floats;
@@ -173,7 +177,6 @@ SubQueryExpr *create_subquery_expression(ParsedSqlNode* sql_node, const char *sq
 %type <table_ref>           table_refs
 %type <table_ref>           table_factor
 %type <table_ref>           joined_table
-// %type <relation_list>       rel_list
 %type <expression>          expression
 %type <expression>          boolean_primary
 %type <expression>          predicate
@@ -182,8 +185,11 @@ SubQueryExpr *create_subquery_expression(ParsedSqlNode* sql_node, const char *sq
 %type <expression>          subquery_expr 
 %type <expression_list>     expression_list
 %type <expression_list>     group_by
+%type <order_by_list>       order_by 
 %type <assignment>          assignment
 %type <assignment_list>     assignment_list
+%type <order_by_list>       order_by_list
+%type <order_by_entry>      order_by_entry
 %type <sql_node>            calc_stmt
 %type <sql_node>            select_stmt
 %type <sql_node>            insert_stmt
@@ -542,8 +548,7 @@ update_stmt:      /*  update 语句的语法解析树*/
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    // SELECT expression_list FROM rel_list where group_by
-    SELECT expression_list FROM table_refs where group_by
+    SELECT expression_list FROM table_refs where group_by order_by
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -563,6 +568,11 @@ select_stmt:        /*  select 语句的语法解析树*/
       if ($6 != nullptr) {
         $$->selection.group_by.swap(*$6);
         delete $6;
+      }
+
+      if ($7 != nullptr) {
+        $$->selection.order_by.swap(*$7);
+        delete $7;
       }
     }
     ;
@@ -757,13 +767,52 @@ comp_op:
     | NOT IN_T { $$ = NOT_IN; }
     ;
 
-// your code here
 group_by:
     /* empty */
     {
       $$ = nullptr;
     }
     | GROUP BY expression_list {
+      $$ = $3;
+    }
+    ;
+order_by_entry:
+    expression {
+      $$ = new OrderBy;
+      $$->is_asc = true;
+      $$->expr.reset($1);
+    }
+    | expression ASC {
+      $$ = new OrderBy;
+      $$->is_asc = true;
+      $$->expr.reset($1);
+    }
+    | expression DESC {
+      $$ = new OrderBy;
+      $$->is_asc = false;
+      $$->expr.reset($1);
+    }
+    ;
+order_by_list:
+    order_by_entry {
+      $$ = new vector<unique_ptr<OrderBy>>;
+      $$->emplace_back($1);
+    }
+    | order_by_entry COMMA order_by_list {
+      if ($3 != nullptr) {
+        $$ = $3;
+      }
+      else {
+        $$ = new vector<unique_ptr<OrderBy>>;
+      }
+      $$->emplace($$->begin(), $1);
+    }
+    ;
+order_by:
+    {
+      $$ = nullptr;
+    }
+    | ORDER_T BY order_by_list {
       $$ = $3;
     }
     ;

@@ -33,6 +33,8 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/mock_logical_operator.h"
 #include "sql/operator/mock_physical_operator.h"
 #include "sql/operator/nested_loop_join_physical_operator.h"
+#include "sql/operator/order_by_logical_operator.h"
+#include "sql/operator/order_by_physical_operator.h"
 #include "sql/operator/predicate_logical_operator.h"
 #include "sql/operator/predicate_physical_operator.h"
 #include "sql/operator/project_logical_operator.h"
@@ -94,6 +96,10 @@ RC PhysicalPlanGenerator::create(
 
     case LogicalOperatorType::GROUP_BY: {
       return create_plan(static_cast<GroupByLogicalOperator &>(logical_operator), oper, session);
+    } break;
+
+    case LogicalOperatorType::ORDER_BY: {
+      return create_plan(static_cast<OrderByLogicalOperator &>(logical_operator), oper, session);
     } break;
 
     case LogicalOperatorType::MOCK: {
@@ -250,8 +256,8 @@ RC PhysicalPlanGenerator::create_plan(
   vector<unique_ptr<Expression>> &expressions = pred_oper.expressions();
   ASSERT(expressions.size() == 1, "predicate logical operator's children should be 1");
 
-  const auto& subquey_exprs = pred_oper.subqueries();
-  auto& predicate = expressions.front();
+  const auto &subquey_exprs = pred_oper.subqueries();
+  auto       &predicate     = expressions.front();
 
   PredicatePhysicalOperator *pred_phy_oper = new PredicatePhysicalOperator(std::move(predicate));
 
@@ -491,7 +497,30 @@ RC PhysicalPlanGenerator::create_plan(
   return rc;
 }
 
-RC PhysicalPlanGenerator::create_plan(MockLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper, Session *session) {
+RC PhysicalPlanGenerator::create_plan(OrderByLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper, Session *session) {
+  RC rc = RC::SUCCESS;
+  ASSERT(logical_oper.children().size() == 1, "order by operator should have 1 child");
+
+  vector<unique_ptr<OrderBy>>& orderbys = logical_oper.orderbys();
+  unique_ptr<OrderByPhysicalOperator> order_by_oper = make_unique<OrderByPhysicalOperator>(std::move(orderbys));
+
+  LogicalOperator             &child_oper = *logical_oper.children().front();
+  unique_ptr<PhysicalOperator> child_physical_oper;
+  rc = create(child_oper, child_physical_oper, session);
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to create child physical operator of order by operator. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  order_by_oper->add_child(std::move(child_physical_oper));
+
+  oper = std::move(order_by_oper);
+  return rc;
+}
+
+RC PhysicalPlanGenerator::create_plan(
+    MockLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper, Session *session)
+{
   oper = unique_ptr<PhysicalOperator>(new MockPhysicalOperator());
   return RC::SUCCESS;
 }

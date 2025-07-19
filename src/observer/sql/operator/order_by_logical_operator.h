@@ -12,16 +12,18 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/operator/logical_operator.h"
 
-// MockLogicalOperator do not have any children
-class MockLogicalOperator : public LogicalOperator
+class OrderByLogicalOperator : public LogicalOperator
 {
 public:
-  MockLogicalOperator() = default;
+  OrderByLogicalOperator(vector<unique_ptr<OrderBy>> orderbys): orderbys_(std::move(orderbys)) {}
 
-  virtual ~MockLogicalOperator() = default;
+  virtual ~OrderByLogicalOperator() = default;
 
-  LogicalOperatorType type() const override { return LogicalOperatorType::MOCK; }
-  OpType              get_op_type() const override { return OpType::LOGICALMOCK; }
+  LogicalOperatorType type() const override { return LogicalOperatorType::ORDER_BY; }
+  OpType              get_op_type() const override { return OpType::LOGICALORDERBY; }
+
+  vector<unique_ptr<OrderBy>>& orderbys() { return orderbys_; }
+
 private:
+  vector<unique_ptr<OrderBy>> orderbys_;
 };
-

@@ -51,6 +51,7 @@ enum class PhysicalOperatorType
   INSERT,
   SCALAR_GROUP_BY,
   HASH_GROUP_BY,
+  ORDER_BY,
   GROUP_BY_VEC,
   AGGREGATE_VEC,
   EXPR_VEC,
