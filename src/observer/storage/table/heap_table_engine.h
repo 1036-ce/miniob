@@ -10,6 +10,7 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include "storage/lob/lob_manager.h"
 #include "storage/table/table_engine.h"
 #include "storage/index/index.h"
 #include "storage/record/record_manager.h"
@@ -26,6 +27,7 @@ public:
   HeapTableEngine(TableMeta *table_meta, Db *db, Table *table) : TableEngine(table_meta), db_(db), table_(table) {}
   ~HeapTableEngine() override;
 
+  RC make_record(int value_num, const Value *values, Record &record) override;
   RC insert_record(Record &record) override;
   RC delete_record(const Record &record) override;
   RC insert_record_with_trx(Record &record, Trx *trx) override { return RC::UNSUPPORTED; }
@@ -35,6 +37,7 @@ public:
     return RC::UNSUPPORTED;
   }
   RC get_record(const RID &rid, Record &record) override;
+  RC get_lob(const LobID &lob_id, char *data, size_t& size) override;
 
   RC create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name) override;
   RC get_record_scanner(RecordScanner *&scanner, Trx *trx, ReadWriteMode mode) override;
@@ -54,7 +57,9 @@ private:
 
 private:
   DiskBufferPool    *data_buffer_pool_ = nullptr;  /// 数据文件关联的buffer pool
+  DiskBufferPool    *lob_buffer_pool_ = nullptr;  /// lob文件关联的buffer pool
   RecordFileHandler *record_handler_   = nullptr;  /// 记录操作
+  LobManager        *lob_manager_      = nullptr;  /// LobManager
   vector<Index *>    indexes_;
   Db                *db_;
   Table             *table_;

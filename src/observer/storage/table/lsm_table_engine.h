@@ -28,6 +28,7 @@ public:
   {}
   ~LsmTableEngine() override = default;
 
+  RC make_record(int value_num, const Value *values, Record &record) override { return RC::UNIMPLEMENTED; }
   RC insert_record(Record &record) override;
   RC delete_record(const Record &record) override { return RC::UNIMPLEMENTED; }
   RC insert_record_with_trx(Record &record, Trx *trx) override { return RC::UNIMPLEMENTED; }
@@ -37,6 +38,7 @@ public:
     return RC::UNIMPLEMENTED;
   }
   RC get_record(const RID &rid, Record &record) override { return RC::UNIMPLEMENTED; }
+  RC get_lob(const LobID& lob_id, char* data, size_t& size) override { return RC::UNIMPLEMENTED; }
 
   RC create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name) override { return RC::UNIMPLEMENTED; }
   RC get_record_scanner(RecordScanner *&scanner, Trx *trx, ReadWriteMode mode) override;

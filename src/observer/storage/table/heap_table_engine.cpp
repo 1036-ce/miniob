@@ -9,6 +9,7 @@ MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 See the Mulan PSL v2 for more details. */
 
 #include "storage/table/heap_table_engine.h"
+#include "common/config.h"
 #include "storage/record/heap_record_scanner.h"
 #include "common/log/log.h"
 #include "storage/index/bplus_tree_index.h"
@@ -28,6 +29,16 @@ HeapTableEngine::~HeapTableEngine()
     data_buffer_pool_ = nullptr;
   }
 
+  if (lob_manager_ != nullptr) {
+    delete lob_manager_;
+    lob_manager_ = nullptr;
+  }
+
+  if (lob_buffer_pool_ != nullptr) {
+    lob_buffer_pool_->close_file();
+    lob_buffer_pool_ = nullptr;
+  }
+
   for (vector<Index *>::iterator it = indexes_.begin(); it != indexes_.end(); ++it) {
     Index *index = *it;
     delete index;
@@ -36,6 +47,89 @@ HeapTableEngine::~HeapTableEngine()
 
   LOG_INFO("Table has been closed: %s", table_meta_->name());
 }
+
+RC HeapTableEngine::make_record(int value_num, const Value *values, Record &record) {
+  RC  rc                 = RC::SUCCESS;
+  int has_nullable_field = static_cast<int>(table_meta_->has_nullable_field());
+
+  // 检查字段类型是否一致
+  if (value_num + table_meta_->sys_field_num() != table_meta_->field_num() - has_nullable_field) {
+    LOG_WARN("Input values don't match the table's schema, table name:%s", table_meta_->name());
+    return RC::SCHEMA_FIELD_MISSING;
+  }
+
+  const int normal_field_start_index = table_meta_->sys_field_num() + has_nullable_field;
+  // 复制所有字段的值
+  int   record_size = table_meta_->record_size();
+  char *record_data = (char *)malloc(record_size);
+  memset(record_data, 0, record_size);
+
+  // 如果有`__null_bitmap`字段，制作bitmap类型的值并填充该字段
+  if (has_nullable_field == 1) {
+    const FieldMeta *field = table_meta_->field(NULL_BITMAP_FIELD_NAME);
+    // allocate mem for bitmap
+    char *data = new char[field->len()];
+
+    common::Bitmap bitmap(data, field->len());
+    bitmap.clear_all();
+    for (int i = 0; i < value_num; ++i) {
+      const Value &value = values[i];
+      if (value.is_null()) {
+        bitmap.set_bit(i);
+      }
+    }
+    Value null_bitmap_val;
+    null_bitmap_val.set_bitmap(bitmap.data(), field->len());
+    LOG_DEBUG("make __null_bitmap field: %s", null_bitmap_val.to_string().c_str());
+
+    // free mem of bitmap
+    delete[] data;
+    rc = set_value_to_record(record_data, null_bitmap_val, field);
+    if (OB_FAIL(rc)) {
+      LOG_WARN("failed to make record. table name:%s", table_meta_->name());
+      free(record_data);
+      return rc;
+    }
+  }
+
+  for (int i = 0; i < value_num && OB_SUCC(rc); i++) {
+    const FieldMeta *field = table_meta_->field(i + normal_field_start_index);
+    const Value     &value = values[i];
+    if (field->type() != value.attr_type()) {
+      Value real_value;
+      if (field->type() == AttrType::TEXT && value.attr_type() == AttrType::CHARS) {
+        LobID lob_id{};
+        size_t length = std::min(value.length(), TEXT_MAX_SIZE);
+        if (OB_FAIL(rc = lob_manager_->insert_lob(value.data(), length, lob_id))) {
+          LOG_WARN("failed to insert a lob");
+          return rc;
+        }  
+        real_value.set_lob_id(lob_id);
+        LOG_DEBUG("make a lob record"); 
+      }
+      else { 
+        rc = Value::cast_to(value, field->type(), real_value);
+        if (OB_FAIL(rc)) {
+          LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
+              table_meta_->name(), field->name(), value.to_string().c_str());
+          break;
+        }
+      }
+      rc = set_value_to_record(record_data, real_value, field);
+    } else {
+      rc = set_value_to_record(record_data, value, field);
+    }
+  }
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to make record. table name:%s", table_meta_->name());
+    free(record_data);
+    return rc;
+  }
+
+  record.set_data_owner(record_data, record_size);
+  return RC::SUCCESS;
+}
+
 RC HeapTableEngine::insert_record(Record &record)
 {
   RC rc = RC::SUCCESS;
@@ -76,6 +170,15 @@ RC HeapTableEngine::get_record(const RID &rid, Record &record)
 
   return rc;
 }
+
+RC HeapTableEngine::get_lob(const LobID &lob_id, char *data, size_t& size) {
+  RC rc = lob_manager_->get_lob(lob_id, data, size);
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to visit lob. lob_id=%d, table=%s, rc=%s", lob_id, table_meta_->name(), strrc(rc));
+    return rc;
+  }
+  return rc;
+} 
 
 RC HeapTableEngine::delete_record(const Record &record)
 {
@@ -250,6 +353,9 @@ RC HeapTableEngine::sync()
   }
 
   rc = data_buffer_pool_->flush_all_pages();
+  if (lob_buffer_pool_) {
+    rc = lob_buffer_pool_->flush_all_pages();
+  }
   LOG_INFO("Sync table over. table=%s", table_meta_->name());
   return rc;
 }
@@ -291,6 +397,22 @@ RC HeapTableEngine::init()
     delete record_handler_;
     record_handler_ = nullptr;
     return rc;
+  }
+
+  if (!table_meta_->lob_file().empty()) {
+    rc  = bpm.open_file(db_->log_handler(), table_meta_->lob_file().data(), lob_buffer_pool_);
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to open disk buffer pool for file:%s. rc=%d:%s", table_meta_->lob_file().data(), rc, strrc(rc));
+      return rc;
+    }
+
+    lob_manager_ = new LobManager;
+    if (OB_FAIL(rc = lob_manager_->init(*lob_buffer_pool_))) {
+      LOG_ERROR("Failed to init lob manager. rc=%s", strrc(rc));
+      delete lob_manager_;
+      lob_manager_ = nullptr;
+      return rc;
+    }
   }
 
   return rc;

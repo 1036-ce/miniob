@@ -43,7 +43,7 @@ RC LobPageHandler::init_empty_page(DiskBufferPool &buffer_pool, PageNum page_num
     return rc;
   }
 
-  lob_page_header_->next_ = LobID{.page_id_ = BP_INVALID_PAGE_NUM};
+  lob_page_header_->next_ = BP_INVALID_PAGE_NUM;
   lob_page_header_->size_ = 0;
 
   return rc;
@@ -126,7 +126,7 @@ RC LobManager::insert_lob(const char *data, int lob_size, LobID &lob_id)
     frame->unpin();
 
     lob_page_handler->write_data(data + offset, size);
-    lob_page_handler->write_header(LobPageHeader{.next_ = {.page_id_ = next_page_num}, .size_ = size});
+    lob_page_handler->write_header(LobPageHeader{.next_ =  next_page_num, .size_ = size});
     lob_page_handler->cleanup();
     if (offset == 0) {
       break;
@@ -135,7 +135,7 @@ RC LobManager::insert_lob(const char *data, int lob_size, LobID &lob_id)
     size          = LOB_PAGE_DATA_SIZE;
     next_page_num = page_num;
   }
-  lob_id = LobID{.page_id_ = page_num};
+  lob_id = page_num;
   return rc;
 }
 
@@ -144,12 +144,12 @@ RC LobManager::delete_lob(const LobID &lob_id)
   RC rc = RC::SUCCESS;
   LobID cur = lob_id;
 
-  while (cur.page_id_ != BP_INVALID_PAGE_NUM) {
+  while (cur != BP_INVALID_PAGE_NUM) {
     unique_ptr<LobPageHandler> lob_page_handler(new LobPageHandler);
-    if (OB_FAIL(rc = lob_page_handler->init(*disk_buffer_pool_, cur.page_id_, ReadWriteMode::READ_WRITE))) {
+    if (OB_FAIL(rc = lob_page_handler->init(*disk_buffer_pool_, cur, ReadWriteMode::READ_WRITE))) {
       return rc;
     }
-    auto page_num = cur.page_id_;
+    auto page_num = cur;
     cur = lob_page_handler->lob_page_header()->next_;
     lob_page_handler->cleanup();
     disk_buffer_pool_->dispose_page(page_num);
@@ -166,8 +166,8 @@ RC LobManager::get_lob(const LobID &lob_id, char *data, size_t& size)
   unique_ptr<LobPageHandler> lob_page_handler(new LobPageHandler);
   LobID cur = lob_id;
 
-  while (cur.page_id_ != BP_INVALID_PAGE_NUM) {
-    if (OB_FAIL(rc = lob_page_handler->init(*disk_buffer_pool_, cur.page_id_, ReadWriteMode::READ_ONLY))) {
+  while (cur != BP_INVALID_PAGE_NUM) {
+    if (OB_FAIL(rc = lob_page_handler->init(*disk_buffer_pool_, cur, ReadWriteMode::READ_ONLY))) {
       return rc;
     }
     

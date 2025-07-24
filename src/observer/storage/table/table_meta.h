@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include "common/lang/serializable.h"
+#include "common/lang/string_view.h"
 #include "common/sys/rc.h"
 #include "common/types.h"
 #include "common/lang/span.h"
@@ -41,9 +42,12 @@ public:
 
   RC add_index(const IndexMeta &index);
 
+  RC set_lob_file(string_view lob_file);
+
 public:
   int32_t             table_id() const { return table_id_; }
   const char         *name() const;
+  string_view        lob_file() const { return lob_file_; }
   const FieldMeta    *trx_field() const;
   const FieldMeta    *field(int index) const;
   const FieldMeta    *field(const char *name) const;
@@ -85,6 +89,7 @@ protected:
   vector<string>    primary_keys_;
   StorageFormat     storage_format_;
   StorageEngine     storage_engine_;
+  string            lob_file_{};
 
   int record_size_ = 0;
 };

@@ -152,6 +152,7 @@ TEST(LobManagerTest, insert_delete_test) {
   test_clean();
 }
 
+
 int main(int argc, char **argv)
 {
   testing::InitGoogleTest(&argc, argv);

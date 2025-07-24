@@ -74,12 +74,27 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
 
   close(fd);
 
+  // if has lob type, then create a lob file
+  string lob_file{};
+  if (has_lob_type(attributes)) {
+    lob_file = table_lob_file(base_dir, name);
+    BufferPoolManager &bpm = db->buffer_pool_manager();
+    rc = bpm.create_file(lob_file.c_str());
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to create disk buffer pool of lob file. file name=%s", lob_file.c_str());
+      return rc;
+    }
+  }
+
   // 创建文件
   const vector<FieldMeta> *trx_fields = db->trx_kit().trx_fields();
   if ((rc = table_meta_.init(table_id, name, trx_fields, attributes, primary_keys, storage_format, storage_engine)) !=
       RC::SUCCESS) {
     LOG_ERROR("Failed to init table meta. name:%s, ret:%d", name, rc);
     return rc;  // delete table file
+  }
+  if (OB_FAIL(rc = table_meta_.set_lob_file(lob_file))) {
+    return rc;
   }
 
   fstream fs;
@@ -193,92 +208,26 @@ RC Table::update_record_with_trx(const Record &old_record, const Record &new_rec
 
 RC Table::get_record(const RID &rid, Record &record) { return engine_->get_record(rid, record); }
 
+RC Table::get_lob(const LobID &lob_id, char *data, size_t& size) const {
+  return engine_->get_lob(lob_id, data, size);
+}
+
 const char *Table::name() const { return table_meta_.name(); }
 
 const TableMeta &Table::table_meta() const { return table_meta_; }
 
 RC Table::make_record(int value_num, const Value *values, Record &record)
 {
-  RC  rc                 = RC::SUCCESS;
-  int has_nullable_field = static_cast<int>(table_meta_.has_nullable_field());
-
-  // 检查字段类型是否一致
-  if (value_num + table_meta_.sys_field_num() != table_meta_.field_num() - has_nullable_field) {
-    LOG_WARN("Input values don't match the table's schema, table name:%s", table_meta_.name());
-    return RC::SCHEMA_FIELD_MISSING;
-  }
-
-  const int normal_field_start_index = table_meta_.sys_field_num() + has_nullable_field;
-  // 复制所有字段的值
-  int   record_size = table_meta_.record_size();
-  char *record_data = (char *)malloc(record_size);
-  memset(record_data, 0, record_size);
-
-  // 如果有`__null_bitmap`字段，制作bitmap类型的值并填充该字段
-  if (has_nullable_field == 1) {
-    const FieldMeta *field = table_meta_.field(NULL_BITMAP_FIELD_NAME);
-    // allocate mem for bitmap
-    char *data = new char[field->len()];
-
-    common::Bitmap bitmap(data, field->len());
-    bitmap.clear_all();
-    for (int i = 0; i < value_num; ++i) {
-      const Value &value = values[i];
-      if (value.is_null()) {
-        bitmap.set_bit(i);
-      }
-    }
-    Value null_bitmap_val;
-    null_bitmap_val.set_bitmap(bitmap.data(), field->len());
-    LOG_DEBUG("make __null_bitmap field: %s", null_bitmap_val.to_string().c_str());
-
-    // free mem of bitmap
-    delete[] data;
-    rc = set_value_to_record(record_data, null_bitmap_val, field);
-    if (OB_FAIL(rc)) {
-      LOG_WARN("failed to make record. table name:%s", table_meta_.name());
-      free(record_data);
-      return rc;
-    }
-  }
-
-  for (int i = 0; i < value_num && OB_SUCC(rc); i++) {
-    const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
-    const Value     &value = values[i];
-    if (field->type() != value.attr_type()) {
-      Value real_value;
-      rc = Value::cast_to(value, field->type(), real_value);
-      if (OB_FAIL(rc)) {
-        LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
-            table_meta_.name(), field->name(), value.to_string().c_str());
-        break;
-      }
-      rc = set_value_to_record(record_data, real_value, field);
-    } else {
-      rc = set_value_to_record(record_data, value, field);
-    }
-  }
-  if (OB_FAIL(rc)) {
-    LOG_WARN("failed to make record. table name:%s", table_meta_.name());
-    free(record_data);
-    return rc;
-  }
-
-  record.set_data_owner(record_data, record_size);
-  return RC::SUCCESS;
+  return engine_->make_record(value_num, values, record);
 }
 
-RC Table::set_value_to_record(char *record_data, const Value &value, const FieldMeta *field)
-{
-  size_t       copy_len = field->len();
-  const size_t data_len = value.length();
-  if (field->type() == AttrType::CHARS) {
-    if (copy_len > data_len) {
-      copy_len = data_len + 1;
+bool Table::has_lob_type(span<const AttrInfoSqlNode> attributes) {
+  for (auto attr: attributes) {
+    if (is_lob_type(attr.type)) {
+      return true;
     }
   }
-  memcpy(record_data + field->offset(), value.data(), copy_len);
-  return RC::SUCCESS;
+  return false;
 }
 
 RC Table::get_record_scanner(RecordScanner *&scanner, Trx *trx, ReadWriteMode mode)

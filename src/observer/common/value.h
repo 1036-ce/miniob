@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/memory.h"
 #include "common/type/attr_type.h"
 #include "common/type/data_type.h"
+#include "storage/lob/lob_manager.h"
 
 /**
  * @brief 属性的值
@@ -166,6 +167,7 @@ public:
   float  get_float() const;
   string get_string() const;
   bool   get_boolean() const;
+  LobID  get_lob_id() const;
 
   char* get_bitmap_data();
 
@@ -173,6 +175,7 @@ public:
   void set_int(int val);
   void set_date(int date);
   void set_float(float val);
+  void set_lob_id(LobID val);
   void set_string(const char *s, int len = 0);
   void set_string_from_other(const Value &other);
   void set_bitmap(const char *s, int len);
@@ -189,6 +192,7 @@ private:
     int32_t date_value_;
     float   float_value_;
     bool    bool_value_;
+    LobID   lob_id_value_;
     char   *pointer_value_;
   } value_ = {.int_value_ = 0};
 

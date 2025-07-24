@@ -28,6 +28,7 @@ static const Json::StaticString FIELD_STORAGE_ENGINE("storage_engine");
 static const Json::StaticString FIELD_FIELDS("fields");
 static const Json::StaticString FIELD_INDEXES("indexes");
 static const Json::StaticString FIELD_PRIMARY_KEYS("primary_keys");
+static const Json::StaticString FIELD_LOB_FILE("lob_file");
 
 TableMeta::TableMeta(const TableMeta &other)
     : table_id_(other.table_id_),
@@ -149,6 +150,11 @@ RC TableMeta::add_index(const IndexMeta &index)
   return RC::SUCCESS;
 }
 
+RC TableMeta::set_lob_file(string_view lob_file) {
+  lob_file_ = lob_file;
+  return RC::SUCCESS;
+}
+
 const char *TableMeta::name() const { return name_.c_str(); }
 
 const FieldMeta *TableMeta::trx_field() const { return &fields_[0]; }
@@ -233,6 +239,7 @@ int TableMeta::serialize(ostream &ss) const
   table_value[FIELD_TABLE_NAME]     = name_;
   table_value[FIELD_STORAGE_FORMAT] = static_cast<int>(storage_format_);
   table_value[FIELD_STORAGE_ENGINE] = static_cast<int>(storage_engine_);
+  table_value[FIELD_LOB_FILE]       = lob_file_;
 
   Json::Value fields_value;
   for (const FieldMeta &field : fields_) {
@@ -296,6 +303,18 @@ int TableMeta::deserialize(istream &is)
 
   string table_name = table_name_value.asString();
 
+  // get lob_file
+  string lob_file{};
+  const Json::Value &lob_file_value = table_value[FIELD_LOB_FILE];
+  if (!lob_file_value.isNull()) {
+    if (!lob_file_value.isString()) {
+      LOG_ERROR("Invalid lob_file name. json value=%s", lob_file_value.toStyledString().c_str());
+      return -1;
+    }
+    lob_file = lob_file_value.asString();
+  }
+
+
   const Json::Value &fields_value = table_value[FIELD_FIELDS];
   if (!fields_value.isArray() || fields_value.size() <= 0) {
     LOG_ERROR("Invalid table meta. fields is not array, json value=%s", fields_value.toStyledString().c_str());
@@ -340,6 +359,7 @@ int TableMeta::deserialize(istream &is)
   storage_format_ = static_cast<StorageFormat>(storage_format);
   storage_engine_ = static_cast<StorageEngine>(storage_engine);
   name_.swap(table_name);
+  lob_file_.swap(lob_file);
   fields_.swap(fields);
   record_size_ = fields_.back().offset() + fields_.back().len() - fields_.begin()->offset();
 

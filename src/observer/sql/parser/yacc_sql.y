@@ -124,6 +124,7 @@ SubQueryExpr *create_subquery_expression(ParsedSqlNode* sql_node, const char *sq
         JOIN_T
         IN_T
         ORDER_T
+        TEXT_T
         EQ
         LT
         GT
@@ -418,6 +419,7 @@ type:
     | FLOAT_T  { $$ = static_cast<int>(AttrType::FLOATS); }
     | VECTOR_T { $$ = static_cast<int>(AttrType::VECTORS); }
     | DATE_T   { $$ = static_cast<int>(AttrType::DATES); }
+    | TEXT_T   { $$ = static_cast<int>(AttrType::TEXT); }
     ;
 primary_key:
     /* empty */

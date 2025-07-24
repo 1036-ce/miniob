@@ -12,10 +12,11 @@ See the Mulan PSL v2 for more details. */
 
 #include "storage/buffer/disk_buffer_pool.h"
 
-struct LobID
-{
-  PageNum page_id_;
-};
+/* struct LobID
+ * {
+ *   PageNum page_id_;
+ * }; */
+using LobID = PageNum;
 
 struct LobPageHeader
 {
@@ -65,17 +66,6 @@ public:
    * @brief 返回该记录页的页号
    */
   PageNum get_page_num() const { return frame_->page_num(); }
-
-  /**
-   * @brief 当前页面是否已经没有空闲位置插入新的记录
-   */
-  bool is_free() const { return frame_->page_num() == BP_INVALID_PAGE_NUM; }
-
-  void set_free() const
-  {
-    frame_->set_page_num(BP_INVALID_PAGE_NUM);
-    frame_->mark_dirty();
-  }
 
   LobPageHeader       *lob_page_header() { return lob_page_header_; }
   const LobPageHeader *lob_page_header() const { return lob_page_header_; }

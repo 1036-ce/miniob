@@ -198,12 +198,31 @@ public:
     FieldExpr       *field_expr = speces_[index];
     const FieldMeta *field_meta = field_expr->field().meta();
     cell.reset();
-    cell.set_type(field_meta->type());
-    cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
-    if (field_meta->field_id() != NULL_BITMAP_FIELD_ID) {
-      cell.set_null(is_null_at(index));
+    if (field_meta->type() != AttrType::TEXT) {
+      cell.set_type(field_meta->type());
+      cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
+      if (field_meta->field_id() != NULL_BITMAP_FIELD_ID) {
+        cell.set_null(is_null_at(index));
+      }
+      return RC::SUCCESS;
     }
-    return RC::SUCCESS;
+    else {
+      // cell.set_int(1);
+      Value tmp;
+      tmp.set_type(field_meta->type());
+      tmp.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
+
+      char *data = new char[TEXT_MAX_SIZE];
+      size_t size{};
+      table_->get_lob(tmp.get_lob_id(), data, size); 
+      cell.set_type(AttrType::CHARS);
+      cell.set_data(data, size);
+      delete[] data;
+      if (field_meta->field_id() != NULL_BITMAP_FIELD_ID) {
+        cell.set_null(is_null_at(index));
+      }
+      return RC::SUCCESS;
+    } 
   }
 
   RC spec_at(int index, TupleCellSpec &spec) const override

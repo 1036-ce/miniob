@@ -88,6 +88,7 @@ public:
   RC delete_record_with_trx(const Record &record, Trx *trx);
   RC update_record_with_trx(const Record &old_record, const Record &new_record, Trx *trx);
   RC get_record(const RID &rid, Record &record);
+  RC get_lob(const LobID &lob_id, char *data, size_t& size) const;
 
   // TODO refactor
   RC create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name);
@@ -116,7 +117,7 @@ public:
   RC sync();
 
 private:
-  RC set_value_to_record(char *record_data, const Value &value, const FieldMeta *field);
+  bool has_lob_type(span<const AttrInfoSqlNode> attributes);
 
 private:
   // RC init_record_handler(const char *base_dir);

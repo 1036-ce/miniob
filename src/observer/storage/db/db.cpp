@@ -194,9 +194,11 @@ RC Db::drop_table(const char *table_name)
 
     string meta_file = table_meta_file(path_.c_str(), table_name);
     string data_file = table_data_file(path_.c_str(), table_name);
+    string lob_file  = table_lob_file(path_.c_str(), table_name);
 
     filesystem::remove(meta_file);
     filesystem::remove(data_file);
+    filesystem::remove(lob_file);
 
     return RC::SUCCESS;
   }

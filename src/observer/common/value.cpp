@@ -100,25 +100,20 @@ Value &Value::operator=(Value &&other)
   return *this;
 }
 
-bool Value::operator==(const Value& other) const {
+bool Value::operator==(const Value &other) const
+{
   if (attr_type_ != other.attr_type_) {
     return false;
   }
 
-  switch(attr_type_) {
+  switch (attr_type_) {
     case AttrType::CHARS:
-    case AttrType::BITMAP:
-      return strcmp(value_.pointer_value_, other.value_.pointer_value_) == 0;
-    case AttrType::INTS:
-      return value_.int_value_ == other.value_.int_value_;
-    case AttrType::FLOATS:
-      return value_.float_value_ == other.value_.float_value_;
-    case AttrType::DATES:
-      return value_.date_value_ == other.value_.date_value_;
-    case AttrType::BOOLEANS:
-      return value_.bool_value_ == other.value_.bool_value_;
-    default:
-      return false;
+    case AttrType::BITMAP: return strcmp(value_.pointer_value_, other.value_.pointer_value_) == 0;
+    case AttrType::INTS: return value_.int_value_ == other.value_.int_value_;
+    case AttrType::FLOATS: return value_.float_value_ == other.value_.float_value_;
+    case AttrType::DATES: return value_.date_value_ == other.value_.date_value_;
+    case AttrType::BOOLEANS: return value_.bool_value_ == other.value_.bool_value_;
+    default: return false;
   }
 }
 
@@ -154,6 +149,10 @@ void Value::set_data(char *data, int length)
     } break;
     case AttrType::INTS: {
       value_.int_value_ = *(int *)data;
+      length_           = length;
+    } break;
+    case AttrType::TEXT: {
+      value_.lob_id_value_ = *(LobID *)data;
       length_           = length;
     } break;
     case AttrType::FLOATS: {
@@ -200,6 +199,15 @@ void Value::set_float(float val)
   value_.float_value_ = val;
   length_             = sizeof(val);
 }
+
+void Value::set_lob_id(LobID val)
+{
+  reset();
+  attr_type_           = AttrType::TEXT;
+  value_.lob_id_value_ = val;
+  length_              = sizeof(LobID);
+}
+
 void Value::set_boolean(bool val)
 {
   reset();
@@ -415,6 +423,12 @@ bool Value::get_boolean() const
     }
   }
   return false;
+}
+
+LobID Value::get_lob_id() const
+{
+  ASSERT(attr_type_ == AttrType::TEXT, "attr_type_ must be TEXT");
+  return value_.lob_id_value_;
 }
 
 char *Value::get_bitmap_data()
