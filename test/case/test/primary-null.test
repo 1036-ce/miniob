@@ -81,3 +81,11 @@ SELECT count(num) FROM null_table3;
 SELECT min(num) FROM null_table3;
 SELECT max(num) FROM null_table3;
 SELECT avg(num) FROM null_table3;
+
+-- echo 7. update field to null
+CREATE TABLE null_table4(id int not null, num int null, name char(10) null);
+INSERT INTO null_table4 VALUES (7, 7, 'N7');
+INSERT INTO null_table4 VALUES (4, 4, 'N4');
+INSERT INTO null_table4 VALUES (7, 7, 'N7');
+UPDATE null_table4 SET num=null where id=7;
+UPDATE null_table4 SET id=null where num is null;

@@ -70,6 +70,15 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
       LOG_INFO("bind expression failed. rc=%s", strrc(rc));
       return rc;
     }
+
+    // 如果当前字段不能为null,但是却要更新为null, 返回错误
+    Value tmp;
+    if (OB_SUCC(rc = target_expressions.back()->try_get_value(tmp))) {
+      if (tmp.is_null() && !field_meta->nullable()) {
+        LOG_WARN("Field '%s' can not be null", field_meta->name());
+        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+      }
+    }
   }
 
 
