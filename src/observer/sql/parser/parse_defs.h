@@ -106,6 +106,11 @@ struct UnboundJoinedTable : public UnboundTable {
   unique_ptr<UnboundTable> right;
 };
 
+struct GroupBy {
+  vector<unique_ptr<Expression>> exprs;
+  unique_ptr<Expression> having_predicate;
+};
+
 struct OrderBy {
   bool is_asc;
   unique_ptr<Expression> expr;
@@ -126,7 +131,8 @@ struct SelectSqlNode
 {
   vector<unique_ptr<Expression>> expressions;  ///< 查询的表达式
   unique_ptr<UnboundTable>       table_refs;
-  vector<unique_ptr<Expression>> group_by;     ///< group by clause
+  // vector<unique_ptr<Expression>> group_by;     ///< group by clause
+  unique_ptr<GroupBy>            group_by;
   unique_ptr<Expression>         condition;    ///< 查询条件
   vector<unique_ptr<OrderBy>>    order_by;
 };

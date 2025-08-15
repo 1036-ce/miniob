@@ -134,6 +134,7 @@ JOIN                                    RETURN_TOKEN(JOIN_T);
 IN                                      RETURN_TOKEN(IN_T);
 ORDER                                   RETURN_TOKEN(ORDER_T);
 TEXT                                    RETURN_TOKEN(TEXT_T);
+HAVING                                  RETURN_TOKEN(HAVING_T);
 {ID}                                    yylval->cstring=strdup(yytext); static_cast<std::vector<char*>*>(yyextra)->push_back(yylval->cstring); RETURN_TOKEN(ID);
 "("                                     RETURN_TOKEN(LBRACE);
 ")"                                     RETURN_TOKEN(RBRACE);

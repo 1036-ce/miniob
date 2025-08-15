@@ -87,6 +87,7 @@ public:
   const unique_ptr<BoundTable> &table_tree() const { return table_tree_; }
   unique_ptr<BoundTable>       &table_tree() { return table_tree_; }
   FilterStmt                   *filter_stmt() const { return filter_stmt_; }
+  FilterStmt                   *having_filter_stmt() const { return having_filter_stmt_; }
 
   vector<unique_ptr<Expression>> &query_expressions() { return query_expressions_; }
   vector<unique_ptr<Expression>> &group_by() { return group_by_; }
@@ -98,9 +99,12 @@ private:
   static auto bind_tables(const unordered_map<string, Table *> &table_map, ExpressionBinder &expr_binder,
       UnboundTable *unbound_table) -> unique_ptr<BoundTable>;
 
+  static RC collect_group_by_expressions(unique_ptr<GroupBy>& group_by, ExpressionBinder& binder, vector<unique_ptr<Expression>>& group_by_expressions);
+
   vector<unique_ptr<Expression>> query_expressions_;
   unique_ptr<BoundTable>         table_tree_;
   FilterStmt                    *filter_stmt_ = nullptr;
   vector<unique_ptr<Expression>> group_by_;
+  FilterStmt                    *having_filter_stmt_ = nullptr;
   vector<unique_ptr<OrderBy>>    order_by_;
 };

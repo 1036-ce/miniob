@@ -139,6 +139,20 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     last_oper = &group_by_oper;
   }
 
+  // having_predicate_oper
+  unique_ptr<LogicalOperator> having_predicate_oper;
+  rc = create_plan(select_stmt->having_filter_stmt(), having_predicate_oper);
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to create predicate logical plan. rc=%s", strrc(rc));
+    return rc;
+  }
+  if (having_predicate_oper) {
+    if (*last_oper) {
+      having_predicate_oper->add_child(std::move(*last_oper));
+    }
+    last_oper = &having_predicate_oper;
+  }
+
   unique_ptr<LogicalOperator> order_by_oper;
   rc = create_order_by_plan(select_stmt, order_by_oper);
   if (OB_FAIL(rc)) {
@@ -440,6 +454,9 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
   // collect all aggregate expressions
   for (unique_ptr<Expression> &expression : query_expressions) {
     collector(expression);
+  }
+  if (select_stmt->having_filter_stmt()) {
+    collector(select_stmt->having_filter_stmt()->predicate());
   }
 
   if (group_by_expressions.empty() && aggregate_expressions.empty()) {

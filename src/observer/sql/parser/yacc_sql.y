@@ -125,6 +125,7 @@ SubQueryExpr *create_subquery_expression(ParsedSqlNode* sql_node, const char *sq
         IN_T
         ORDER_T
         TEXT_T
+        HAVING_T
         EQ
         LT
         GT
@@ -149,6 +150,7 @@ SubQueryExpr *create_subquery_expression(ParsedSqlNode* sql_node, const char *sq
   std::vector<unique_ptr<Assignment>> *      assignment_list;
   OrderBy*                                   order_by_entry;
   vector<unique_ptr<OrderBy>>*               order_by_list;
+  GroupBy*                                   group_by;
   char *                                     cstring;
   int                                        number;
   float                                      floats;
@@ -185,7 +187,7 @@ SubQueryExpr *create_subquery_expression(ParsedSqlNode* sql_node, const char *sq
 %type <expression>          simple_expr
 %type <expression>          subquery_expr 
 %type <expression_list>     expression_list
-%type <expression_list>     group_by
+%type <group_by>            group_by
 %type <order_by_list>       order_by 
 %type <assignment>          assignment
 %type <assignment_list>     assignment_list
@@ -571,8 +573,8 @@ select_stmt:        /*  select 语句的语法解析树*/
       }
 
       if ($6 != nullptr) {
-        $$->selection.group_by.swap(*$6);
-        delete $6;
+        // $$->selection.group_by.swap(*$6);
+        $$->selection.group_by.reset($6);
       }
 
       if ($7 != nullptr) {
@@ -778,7 +780,16 @@ group_by:
       $$ = nullptr;
     }
     | GROUP BY expression_list {
-      $$ = $3;
+      $$ = new GroupBy;
+      $$->exprs.swap(*$3);
+      delete $3;
+      $$->having_predicate = nullptr;
+    }
+    | GROUP BY expression_list HAVING_T expression {
+      $$ = new GroupBy;
+      $$->exprs.swap(*$3);
+      delete $3;
+      $$->having_predicate.reset($5);
     }
     ;
 order_by_entry:

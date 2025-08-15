@@ -1,0 +1,16 @@
+-- echo initialization
+CREATE TABLE aggregation_func(id int, num int, price float, addr char(4), birthday date);
+create table t_group_by (id int not null, score int not null, name char(1) null);
+create table t_group_by_2 (id int not null, age int not null);
+insert into t_group_by VALUES (1, 1, '1');
+insert into t_group_by VALUES (1, 2, '2');
+insert into t_group_by VALUES (1, 3, '3');
+insert into t_group_by VALUES (1, 4, '4');
+insert into t_group_by VALUES (2, 1, '1');
+insert into t_group_by VALUES (2, 2, '2');
+insert into t_group_by VALUES (3, 1, '1');
+insert into t_group_by VALUES (3, 2, '2');
+insert into t_group_by VALUES (3, 3, '3');
+insert into t_group_by VALUES (3, 4, '4');
+
+select id, max(score) from t_group_by group by id having count(*)>3;

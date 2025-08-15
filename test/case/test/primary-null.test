@@ -89,3 +89,6 @@ INSERT INTO null_table4 VALUES (4, 4, 'N4');
 INSERT INTO null_table4 VALUES (7, 7, 'N7');
 UPDATE null_table4 SET num=null where id=7;
 UPDATE null_table4 SET id=null where num is null;
+
+-- echo 8. init update-select
+
