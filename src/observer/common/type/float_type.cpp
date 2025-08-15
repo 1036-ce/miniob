@@ -110,12 +110,13 @@ RC FloatType::set_value_from_str(Value &val, const string &data) const
 
   float float_value;
   deserialize_stream >> float_value;
+  val.set_float(float_value);
   // if (!deserialize_stream || !deserialize_stream.eof()) {
-  if (!deserialize_stream) {
-    rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
-  } else {
-    val.set_float(float_value);
-  }
+  /* if (!deserialize_stream) {
+   *   rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
+   * } else {
+   *   val.set_float(float_value);
+   * } */
   return rc;
 }
 

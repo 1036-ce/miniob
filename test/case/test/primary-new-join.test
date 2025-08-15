@@ -6,6 +6,7 @@ create table join_table_empty_1(id int, num_empty_1 int);
 create table join_table_empty_2(id int, num_empty_2 int);
 
 INSERT INTO join_table_1 VALUES (4, '16a');
+INSERT INTO join_table_1 VALUES (4, 'a16');
 INSERT INTO join_table_2 VALUES (3, 15);
 INSERT INTO join_table_2 VALUES (3, 16);
 INSERT INTO join_table_2 VALUES (3, 17);

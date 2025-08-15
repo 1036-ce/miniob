@@ -110,12 +110,13 @@ RC IntegerType::set_value_from_str(Value &val, const string &data) const
   deserialize_stream.str(data);
   int int_value;
   deserialize_stream >> int_value;
+  val.set_int(int_value);
   // if (!deserialize_stream || !deserialize_stream.eof()) {
-  if (!deserialize_stream) {
-    rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
-  } else {
-    val.set_int(int_value);
-  }
+  /* if (!deserialize_stream) {
+   *   rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
+   * } else {
+   *   val.set_int(int_value);
+   * }  */
   return rc;
 }
 
