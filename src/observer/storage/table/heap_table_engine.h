@@ -37,9 +37,10 @@ public:
     return RC::UNSUPPORTED;
   }
   RC get_record(const RID &rid, Record &record) override;
-  RC get_lob(const LobID &lob_id, char *data, size_t& size) override;
+  RC get_lob(const LobID &lob_id, char *data, size_t &size) override;
 
   RC create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name) override;
+  RC create_index(Trx *trx, const vector<FieldMeta> field_metas, const char *index_name) override;
   RC get_record_scanner(RecordScanner *&scanner, Trx *trx, ReadWriteMode mode) override;
   RC get_chunk_scanner(ChunkFileScanner &scanner, Trx *trx, ReadWriteMode mode) override;
   RC visit_record(const RID &rid, function<bool(Record &)> visitor) override;
@@ -47,17 +48,21 @@ public:
 
   Index *find_index(const char *index_name) const override;
   Index *find_index_by_field(const char *field_name) const override;
-  RC     open() override;
+  Index *find_best_match_index(
+      unique_ptr<Expression> &predicate, unique_ptr<Expression> &residual_predicate) const override;
+  RC open() override;
   // init_record_handler
   RC init() override;
 
 private:
   RC insert_entry_of_indexes(const char *record, const RID &rid);
   RC delete_entry_of_indexes(const char *record, const RID &rid, bool error_on_not_exists);
+  RC insert_entry_of_indexes(const Record &record);
+  RC delete_entry_of_indexes(const Record &record, bool error_on_not_exists);
 
 private:
   DiskBufferPool    *data_buffer_pool_ = nullptr;  /// 数据文件关联的buffer pool
-  DiskBufferPool    *lob_buffer_pool_ = nullptr;  /// lob文件关联的buffer pool
+  DiskBufferPool    *lob_buffer_pool_  = nullptr;  /// lob文件关联的buffer pool
   RecordFileHandler *record_handler_   = nullptr;  /// 记录操作
   LobManager        *lob_manager_      = nullptr;  /// LobManager
   vector<Index *>    indexes_;

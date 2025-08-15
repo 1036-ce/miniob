@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 
 #include <string.h>
 
+#include "common/config.h"
 #include "common/lang/comparator.h"
 #include "common/lang/memory.h"
 #include "common/lang/sstream.h"
@@ -32,6 +33,8 @@ See the Mulan PSL v2 for more details. */
 
 class BplusTreeHandler;
 class BplusTreeMiniTransaction;
+
+static constexpr int INDEX_NULL_BITMAP_LENGTH = 1;
 
 /**
  * @brief B+树的实现
@@ -49,6 +52,13 @@ enum class BplusTreeOperationType
   DELETE,
 };
 
+struct IndexKeyFieldMeta
+{
+  AttrType attr_type_;
+  int      attr_offset_;
+  int      attr_len_;
+};
+
 /**
  * @brief 属性比较(BplusTree)
  * @ingroup BPlusTree
@@ -56,29 +66,78 @@ enum class BplusTreeOperationType
 class AttrComparator
 {
 public:
-  void init(AttrType type, int length)
+  void init(const IndexKeyFieldMeta *attr_infos, int32_t attr_cnt, int32_t comp_cnt = -1)
   {
-    attr_type_   = type;
-    attr_length_ = length;
+    for (int32_t i = 0; i < attr_cnt; ++i) {
+      attr_infos_.push_back(attr_infos[i]);
+    }
+    comp_column_cnt_ = (comp_cnt == -1 ? attr_cnt : comp_cnt);
   }
 
-  int attr_length() const { return attr_length_; }
+  void set_comp_column_cnt(int cnt) { comp_column_cnt_ = cnt; }
+
+  int get_comp_column_cnt() { return comp_column_cnt_; }
+
+  int length() const
+  {
+    int ret = INDEX_NULL_BITMAP_LENGTH;
+    for (const auto &attr_info : attr_infos_) {
+      ret += attr_info.attr_len_;
+    }
+    return ret;
+  }
 
   int operator()(const char *v1, const char *v2) const
   {
-    // TODO: optimized the comparison
-    Value left;
-    left.set_type(attr_type_);
-    left.set_data(v1, attr_length_);
-    Value right;
-    right.set_type(attr_type_);
-    right.set_data(v2, attr_length_);
-    return DataType::type_instance(attr_type_)->compare(left, right);
+    common::Bitmap v1_null_bitmap{const_cast<char *>(v1), INDEX_NULL_BITMAP_LENGTH};
+    common::Bitmap v2_null_bitmap{const_cast<char *>(v2), INDEX_NULL_BITMAP_LENGTH};
+
+    auto get_value =
+        [](common::Bitmap &null_bitmap, const char *data, const IndexKeyFieldMeta &attr_info, int index) -> Value {
+      Value val;
+      val.set_type(attr_info.attr_type_);
+      val.set_data(data + attr_info.attr_offset_, attr_info.attr_len_);
+      val.set_null(null_bitmap.get_bit(index));
+      return val;
+    };
+
+    for (int i = 0; i < comp_column_cnt_; ++i) {
+      const IndexKeyFieldMeta &attr_info = attr_infos_.at(i);
+      Value                  left      = get_value(v1_null_bitmap, v1, attr_info, i);
+      Value                  right     = get_value(v2_null_bitmap, v2, attr_info, i);
+
+      if (left.is_null()) {
+        return -1;
+      }
+      if (right.is_null()) {
+        return 1;
+      }
+
+      int result = left.compare(right);
+      if (result == 0) {
+        continue;
+      }
+      return result;
+    }
+    /*     for (const auto& attr_info: attr_infos_) {
+     *       Value left;
+     *       left.set_type(attr_info.attr_type_);
+     *       left.set_data(v1 + attr_info.attr_offset_, attr_info.attr_len_);
+     *       Value right;
+     *       right.set_type(attr_info.attr_type_);
+     *       right.set_data(v1 + attr_info.attr_offset_, attr_info.attr_len_);
+     *
+     *       auto result = DataType::type_instance(attr_info.attr_type_)->compare(left, right);
+     *       if (result != 0) {
+     *         return result;
+     *       }
+     *     } */
+    return 0;
   }
 
 private:
-  AttrType attr_type_;
-  int      attr_length_;
+  vector<IndexKeyFieldMeta> attr_infos_;
+  int                     comp_column_cnt_;
 };
 
 /**
@@ -89,9 +148,18 @@ private:
 class KeyComparator
 {
 public:
-  void init(AttrType type, int length) { attr_comparator_.init(type, length); }
+  KeyComparator() = default;
+  KeyComparator(const IndexKeyFieldMeta *attr_infos, int32_t attr_cnt, int32_t comp_cnt = -1) {
+    attr_comparator_.init(attr_infos, attr_cnt, comp_cnt);
+  }
+
+  void init(const IndexKeyFieldMeta *attr_infos, int32_t attr_cnt) { attr_comparator_.init(attr_infos, attr_cnt, -1); }
 
   const AttrComparator &attr_comparator() const { return attr_comparator_; }
+
+  void set_comp_column_cnt(int cnt) { attr_comparator_.set_comp_column_cnt(cnt); }
+
+  int get_comp_column_cnt() { return attr_comparator_.get_comp_column_cnt(); }
 
   int operator()(const char *v1, const char *v2) const
   {
@@ -100,8 +168,8 @@ public:
       return result;
     }
 
-    const RID *rid1 = (const RID *)(v1 + attr_comparator_.attr_length());
-    const RID *rid2 = (const RID *)(v2 + attr_comparator_.attr_length());
+    const RID *rid1 = (const RID *)(v1 + attr_comparator_.length());
+    const RID *rid2 = (const RID *)(v2 + attr_comparator_.length());
     return RID::compare(rid1, rid2);
   }
 
@@ -116,23 +184,38 @@ private:
 class AttrPrinter
 {
 public:
-  void init(AttrType type, int length)
+  void init(IndexKeyFieldMeta *attr_infos, int32_t attr_cnt)
   {
-    attr_type_   = type;
-    attr_length_ = length;
+    for (int32_t i = 0; i < attr_cnt; ++i) {
+      attr_infos_.push_back(attr_infos[i]);
+    }
   }
 
-  int attr_length() const { return attr_length_; }
+  int length() const
+  {
+    int ret = INDEX_NULL_BITMAP_LENGTH;
+    for (const auto &attr_info : attr_infos_) {
+      ret += attr_info.attr_len_;
+    }
+    return ret;
+  }
 
   string operator()(const char *v) const
   {
-    Value value(attr_type_, const_cast<char *>(v), attr_length_);
-    return value.to_string();
+    string ret;
+    for (size_t i = 0; i < attr_infos_.size(); ++i) {
+      const auto &attr_info = attr_infos_.at(i);
+      Value       value(attr_info.attr_type_, const_cast<char *>(v + attr_info.attr_offset_), attr_info.attr_len_);
+      ret.append(value.to_string());
+      if (i < attr_infos_.size() - 1) {
+        ret.push_back(',');
+      }
+    }
+    return ret;
   }
 
 private:
-  AttrType attr_type_;
-  int      attr_length_;
+  vector<IndexKeyFieldMeta> attr_infos_;
 };
 
 /**
@@ -142,7 +225,7 @@ private:
 class KeyPrinter
 {
 public:
-  void init(AttrType type, int length) { attr_printer_.init(type, length); }
+  void init(IndexKeyFieldMeta *attr_infos, int32_t attr_cnt) { attr_printer_.init(attr_infos, attr_cnt); }
 
   const AttrPrinter &attr_printer() const { return attr_printer_; }
 
@@ -151,7 +234,7 @@ public:
     stringstream ss;
     ss << "{key:" << attr_printer_(v) << ",";
 
-    const RID *rid = (const RID *)(v + attr_printer_.attr_length());
+    const RID *rid = (const RID *)(v + attr_printer_.length());
     ss << "rid:{" << rid->to_string() << "}}";
     return ss.str();
   }
@@ -173,23 +256,21 @@ struct IndexFileHeader
     memset(this, 0, sizeof(IndexFileHeader));
     root_page = BP_INVALID_PAGE_NUM;
   }
-  PageNum  root_page;          ///< 根节点在磁盘中的页号
-  int32_t  internal_max_size;  ///< 内部节点最大的键值对数
-  int32_t  leaf_max_size;      ///< 叶子节点最大的键值对数
-  int32_t  attr_length;        ///< 键值的长度
-  int32_t  key_length;         ///< attr length + sizeof(RID)
-  AttrType attr_type;          ///< 键值的类型
+  PageNum root_page;          ///< 根节点在磁盘中的页号
+  int32_t internal_max_size;  ///< 内部节点最大的键值对数
+  int32_t leaf_max_size;      ///< 叶子节点最大的键值对数
+  // int32_t  attr_length;        ///< 键值的长度
+  int32_t key_length;  ///< attr length + sizeof(RID)
+  // AttrType attr_type;          ///< 键值的类型
+  IndexKeyFieldMeta attr_infos[INDEX_MAX_COLUMN_COUNT];
+  int32_t         attr_cnt;
 
   const string to_string() const
   {
     stringstream ss;
 
-    ss << "attr_length:" << attr_length << ","
-       << "key_length:" << key_length << ","
-       << "attr_type:" << attr_type_to_string(attr_type) << ","
-       << "root_page:" << root_page << ","
-       << "internal_max_size:" << internal_max_size << ","
-       << "leaf_max_size:" << leaf_max_size << ";";
+    ss << "key_length:" << key_length << "," << "root_page:" << root_page << ","
+       << "internal_max_size:" << internal_max_size << "," << "leaf_max_size:" << leaf_max_size << ";";
 
     return ss.str();
   }
@@ -351,6 +432,16 @@ public:
    */
   int lookup(const KeyComparator &comparator, const char *key, bool *found = nullptr) const;
 
+  /**
+   * 找到第一个大于或等于`key`的位置
+   */
+  int find_first_greater_equal(const KeyComparator &comparator, const char *key);
+
+  /**
+   * 找到第一个大于`key`的位置
+   */
+  int find_first_greater(const KeyComparator &comparator, const char *key);
+
   RC  insert(int index, const char *key, const char *value);
   RC  remove(int index);
   int remove(const char *key, const KeyComparator &comparator);
@@ -413,6 +504,16 @@ public:
       const KeyComparator &comparator, const char *key, bool *found = nullptr, int *insert_position = nullptr) const;
 
   /**
+   * 找到第一个大于或等于`key`的位置
+   */
+  int find_first_greater_equal(const KeyComparator &comparator, const char *key);
+
+  /**
+   * 找到第一个大于`key`的位置
+   */
+  int find_first_greater(const KeyComparator &comparator, const char *key);
+
+  /**
    * @brief 把当前节点的所有数据都迁移到另一个节点上
    *
    * @param other 数据迁移的目标节点
@@ -442,6 +543,8 @@ private:
   InternalIndexNode *internal_node_ = nullptr;
 };
 
+class BplusTreeScanner;
+
 /**
  * @brief B+树的实现
  * @ingroup BPlusTree
@@ -459,9 +562,12 @@ public:
    * @param internal_max_size 内部节点最大大小
    * @param leaf_max_size 叶子节点最大大小
    */
-  RC create(LogHandler &log_handler, BufferPoolManager &bpm, const char *file_name, AttrType attr_type, int attr_length,
-      int internal_max_size = -1, int leaf_max_size = -1);
-  RC create(LogHandler &log_handler, DiskBufferPool &buffer_pool, AttrType attr_type, int attr_length,
+  /* RC create(LogHandler &log_handler, BufferPoolManager &bpm, const char *file_name, AttrType attr_type, int
+   * attr_length, int internal_max_size = -1, int leaf_max_size = -1); RC create(LogHandler &log_handler, DiskBufferPool
+   * &buffer_pool, AttrType attr_type, int attr_length, int internal_max_size = -1, int leaf_max_size = -1); */
+  RC create(LogHandler &log_handler, BufferPoolManager &bpm, const char *file_name,
+      const vector<FieldMeta> &field_metas, int internal_max_size = -1, int leaf_max_size = -1);
+  RC create(LogHandler &log_handler, DiskBufferPool &buffer_pool, const vector<FieldMeta> &field_metas,
       int internal_max_size = -1, int leaf_max_size = -1);
 
   /**
@@ -484,14 +590,18 @@ public:
    * 即向索引中插入一个值为（user_key，rid）的键值对
    * @note 这里假设user_key的内存大小与attr_length 一致
    */
-  RC insert_entry(const char *user_key, const RID *rid);
+  // RC insert_entry(const char *user_key, const RID *rid);
+
+  RC insert_entry(const vector<Value>& values, const RID *rid);
 
   /**
    * @brief 从IndexHandle句柄对应的索引中删除一个值为（user_key，rid）的索引项
    * @return RECORD_INVALID_KEY 指定值不存在
    * @note 这里假设user_key的内存大小与attr_length 一致
    */
-  RC delete_entry(const char *user_key, const RID *rid);
+  // RC delete_entry(const char *user_key, const RID *rid);
+
+  RC delete_entry(const vector<Value>& values, const RID *rid);
 
   bool is_empty() const;
 
@@ -511,12 +621,10 @@ public:
    */
   bool validate_tree();
 
-public:
   const IndexFileHeader &file_header() const { return file_header_; }
   DiskBufferPool        &buffer_pool() const { return *disk_buffer_pool_; }
   LogHandler            &log_handler() const { return *log_handler_; }
 
-public:
   /**
    * @brief 恢复更新ROOT页面
    * @details 重做日志时调用的接口
@@ -528,7 +636,6 @@ public:
    */
   RC recover_init_header_page(BplusTreeMiniTransaction &mtr, Frame *frame, const IndexFileHeader &header);
 
-public:
   /**
    * 这些函数都是线程不安全的，不要在多线程的环境下调用
    */
@@ -553,6 +660,8 @@ protected:
    * @param[out] frame 返回找到的叶子节点
    */
   RC find_leaf(BplusTreeMiniTransaction &mtr, BplusTreeOperationType op, const char *key, Frame *&frame);
+
+  RC find_leaf(BplusTreeMiniTransaction &mtr, BplusTreeOperationType op, const KeyComparator& key_comp, const char *key, Frame *&frame);
 
   /**
    * @brief 找到最左边的叶子节点
@@ -632,8 +741,42 @@ protected:
    */
   RC adjust_root(BplusTreeMiniTransaction &mtr, Frame *root_frame);
 
+  common::MemPoolItem::item_unique_ptr make_key(const vector<Value> &values, const RID &rid);
+
 private:
   common::MemPoolItem::item_unique_ptr make_key(const char *user_key, const RID &rid);
+
+public:
+  class Iterator
+  {
+  public:
+    friend class BplusTreeHandler;
+    Iterator() = default;
+    Iterator(BplusTreeHandler *tree_handler): tree_handler_(tree_handler) {}
+    Iterator(BplusTreeHandler *tree_handler, Frame *frame, int index)
+        : tree_handler_(tree_handler), leaf_frame_(frame), index_(index)
+    {}
+    // RC init(Frame* frame, int index);
+    ~Iterator() = default;
+
+    bool operator==(const Iterator &rhs);
+    bool operator!=(const Iterator &rhs);
+    RC   next(BplusTreeMiniTransaction& mtr);
+    RC   get_value(BplusTreeMiniTransaction& mtr, RID &rid);
+
+  private:
+    void              set_end() { leaf_frame_ = nullptr; index_ = 0; }
+    bool              is_end() { return leaf_frame_ == nullptr && index_ == 0; }
+    BplusTreeHandler *tree_handler_ = nullptr;
+    Frame            *leaf_frame_   = nullptr;
+    int               index_;
+  };
+
+  Iterator begin(BplusTreeMiniTransaction& mtr);
+  Iterator end();
+  Iterator find(BplusTreeMiniTransaction& mtr, const KeyComparator& key_comp, const char *key);
+  Iterator find_left_bound(BplusTreeMiniTransaction& mtr, const KeyComparator& key_comp, const char *key);
+  Iterator find_right_bound(BplusTreeMiniTransaction& mtr, const KeyComparator& key_comp, const char *key);
 
 protected:
   LogHandler     *log_handler_      = nullptr;  /// 日志处理器
@@ -676,7 +819,9 @@ public:
    * TODO 重构参数表示方法
    */
   RC open(const char *left_user_key, int left_len, bool left_inclusive, const char *right_user_key, int right_len,
-      bool right_inclusive);
+      bool right_inclusive) { return RC::SUCCESS; }
+
+  RC open(vector<Value> left_values, bool left_inclusive, vector<Value> right_values, bool right_inclusive);
 
   /**
    * @brief 获取下一条记录
@@ -696,17 +841,7 @@ public:
   RC close();
 
 private:
-  /**
-   * 如果key的类型是CHARS, 扩展或缩减user_key的大小刚好是schema中定义的大小
-   */
-  RC fix_user_key(const char *user_key, int key_len, bool want_greater, char **fixed_key, bool *should_inclusive);
-
   void fetch_item(RID &rid);
-
-  /**
-   * @brief 判断是否到了扫描的结束位置
-   */
-  bool touch_end();
 
 private:
   bool                     inited_ = false;
@@ -715,9 +850,13 @@ private:
 
   /// 使用左右叶子节点和位置来表示扫描的起始位置和终止位置
   /// 起始位置和终止位置都是有效的数据
-  Frame *current_frame_ = nullptr;
+  // Frame *current_frame_ = nullptr;
 
-  common::MemPoolItem::item_unique_ptr right_key_;
-  int                                  iter_index_    = -1;
-  bool                                 first_emitted_ = false;
+  // common::MemPoolItem::item_unique_ptr right_key_;
+  /* int                                  iter_index_    = -1;
+   * bool                                 first_emitted_ = false; */
+
+  BplusTreeHandler::Iterator iter_;
+  BplusTreeHandler::Iterator left_iter_;
+  BplusTreeHandler::Iterator right_iter_;
 };

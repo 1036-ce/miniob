@@ -245,9 +245,17 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
   return engine_->create_index(trx, field_meta, index_name);
 }
 
+RC Table::create_index(Trx *trx, const vector<FieldMeta>& field_metas, const char *index_name) {
+  return engine_->create_index(trx, field_metas, index_name);
+}
+
 RC Table::delete_record(const Record &record) { return engine_->delete_record(record); }
 
 Index *Table::find_index(const char *index_name) const { return engine_->find_index(index_name); }
 Index *Table::find_index_by_field(const char *field_name) const { return engine_->find_index_by_field(field_name); }
+
+Index *Table::find_best_match_index(const unique_ptr<Expression>& predicate, unique_ptr<Expression>& residual_predicate) const {
+  return nullptr;
+}
 
 RC Table::sync() { return engine_->sync(); }

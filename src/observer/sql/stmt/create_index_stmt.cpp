@@ -72,17 +72,17 @@ RC CreateIndexStmt::create(Db *db, const CreateIndexSqlNode &create_index, Stmt 
  *   }
  * 
  *   stmt = new CreateIndexStmt(table, field_meta, create_index.index_name); */
-  vector<const FieldMeta*> field_metas;
+  vector<FieldMeta> field_metas;
   for (const auto& attr: create_index.attr_names) {
     auto field_meta = table->table_meta().field(attr.c_str());
     if (nullptr == field_meta) {
       LOG_WARN("no such field in table. db=%s, table=%s, field=%s", db->name(), table_name, attr.c_str());
       return RC::SCHEMA_FIELD_NOT_EXIST;
     }
-    field_metas.push_back(field_meta);
+    field_metas.push_back(*field_meta);
   }
 
-  stmt = new CreateIndexStmt(table, field_metas.front(), create_index.index_name);
+  stmt = new CreateIndexStmt(table, field_metas, create_index.index_name);
 
   return RC::SUCCESS;
 }
