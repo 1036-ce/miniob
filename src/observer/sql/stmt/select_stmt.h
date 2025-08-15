@@ -96,10 +96,8 @@ public:
 private:
   static auto collect_tables(
       Db *db, UnboundTable *table_ref, unordered_map<string, Table *> &table_map, BinderContext &binder_context) -> RC;
-  static auto bind_tables(const unordered_map<string, Table *> &table_map, ExpressionBinder &expr_binder,
-      UnboundTable *unbound_table) -> unique_ptr<BoundTable>;
-
-  static RC collect_group_by_expressions(unique_ptr<GroupBy>& group_by, ExpressionBinder& binder, vector<unique_ptr<Expression>>& group_by_expressions);
+  static RC bind_tables(const unordered_map<string, Table *> &table_map, ExpressionBinder &expr_binder,
+      UnboundTable *unbound_table, unique_ptr<BoundTable>& bound_table);
 
   vector<unique_ptr<Expression>> query_expressions_;
   unique_ptr<BoundTable>         table_tree_;

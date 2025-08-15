@@ -52,7 +52,11 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   vector<unique_ptr<Expression>> bound_expressions;
   ExpressionBinder               expression_binder(binder_context);
 
-  unique_ptr<BoundTable> tables = bind_tables(table_map, expression_binder, select_sql.table_refs.get());
+  // unique_ptr<BoundTable> tables = bind_tables(table_map, expression_binder, select_sql.table_refs.get());
+  unique_ptr<BoundTable> tables;
+  if (OB_FAIL(rc = bind_tables(table_map, expression_binder, select_sql.table_refs.get(), tables))) {
+    return rc;
+  }
 
   for (unique_ptr<Expression> &expression : select_sql.expressions) {
     rc = expression_binder.bind_expression(expression, bound_expressions);
@@ -72,7 +76,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
         return rc;
       }
     }
-  } 
+  }
 
   // create orderby clause
   vector<unique_ptr<Expression>> orderby_expressions;
@@ -147,7 +151,11 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, BinderCont
   vector<unique_ptr<Expression>> bound_expressions;
   ExpressionBinder               expression_binder(binder_context);
 
-  unique_ptr<BoundTable> tables = bind_tables(table_map, expression_binder, select_sql.table_refs.get());
+  // unique_ptr<BoundTable> tables = bind_tables(table_map, expression_binder, select_sql.table_refs.get());
+  unique_ptr<BoundTable> tables;
+  if (OB_FAIL(rc = bind_tables(table_map, expression_binder, select_sql.table_refs.get(), tables))) {
+    return rc;
+  }
 
   for (unique_ptr<Expression> &expression : select_sql.expressions) {
     rc = expression_binder.bind_expression(expression, bound_expressions);
@@ -240,71 +248,41 @@ auto SelectStmt::collect_tables(
   return RC::UNSUPPORTED;
 }
 
-auto SelectStmt::bind_tables(const unordered_map<string, Table *> &table_map, ExpressionBinder &expr_binder,
-    UnboundTable *unbound_table) -> unique_ptr<BoundTable>
+RC SelectStmt::bind_tables(const unordered_map<string, Table *> &table_map, ExpressionBinder &expr_binder,
+    UnboundTable *unbound_table, unique_ptr<BoundTable> &bound_table)
 {
   if (UnboundSingleTable *single_table = dynamic_cast<UnboundSingleTable *>(unbound_table); single_table != nullptr) {
     // single_table->relation_name 一定存在
     Table *table = table_map.at(single_table->relation_name);
-    return make_unique<BoundSingleTable>(table);
+    bound_table  = make_unique<BoundSingleTable>(table);
+    return RC::SUCCESS;
   }
 
+  RC rc = RC::SUCCESS;
   if (UnboundJoinedTable *joined_table = dynamic_cast<UnboundJoinedTable *>(unbound_table); joined_table != nullptr) {
-    auto left  = bind_tables(table_map, expr_binder, joined_table->left.get());
-    auto right = bind_tables(table_map, expr_binder, joined_table->right.get());
+    unique_ptr<BoundTable> left_table, right_table;
+    if (OB_FAIL(rc = bind_tables(table_map, expr_binder, joined_table->left.get(), left_table))) {
+      return rc;
+    }
+    if (OB_FAIL(rc = bind_tables(table_map, expr_binder, joined_table->right.get(), right_table))) {
+      return rc;
+    }
 
     if (joined_table->expr) {
       vector<unique_ptr<Expression>> bound_expressions;
-      expr_binder.bind_expression(joined_table->expr, bound_expressions);
+      if (OB_FAIL(rc = expr_binder.bind_expression(joined_table->expr, bound_expressions))) {
+        return rc;
+      }
       ASSERT(bound_expressions.size() == 1, "bound_expressions' size must be 1");
 
-      return make_unique<BoundJoinedTable>(
-          joined_table->type, std::move(bound_expressions.at(0)), std::move(left), std::move(right));
+      bound_table = make_unique<BoundJoinedTable>(
+          joined_table->type, std::move(bound_expressions.at(0)), std::move(left_table), std::move(right_table));
+      return RC::SUCCESS;
     }
-    return make_unique<BoundJoinedTable>(joined_table->type, nullptr, std::move(left), std::move(right));
+    bound_table = make_unique<BoundJoinedTable>(joined_table->type, nullptr, std::move(left_table), std::move(right_table));
+    return RC::SUCCESS;
   }
 
   ASSERT(false, "Unreachable code touched");
-  return nullptr;
-}
-
-RC SelectStmt::collect_group_by_expressions(
-    unique_ptr<GroupBy> &group_by, ExpressionBinder &binder, vector<unique_ptr<Expression>> &group_by_expressions)
-{
-  if (!group_by) {
-    return RC::SUCCESS;
-  }
-  for (unique_ptr<Expression> &expression : group_by->exprs) {
-    RC rc = binder.bind_expression(expression, group_by_expressions);
-    if (OB_FAIL(rc)) {
-      LOG_INFO("bind expression failed. rc=%s", strrc(rc));
-    }
-  }
-
-  if (!group_by->having_predicate) {
-    return RC::SUCCESS;
-  }
-
-  auto                                   having_predicate = group_by->having_predicate->copy();
-  vector<unique_ptr<Expression>>         exprs;
-  function<RC(unique_ptr<Expression> &)> collector = [&](unique_ptr<Expression> &expr) -> RC {
-    if (expr->type() == ExprType::AGGREGATION || expr->type() == ExprType::UNBOUND_AGGREGATION) {
-      exprs.emplace_back(std::move(expr));
-      return RC::SUCCESS;
-    }
-    return ExpressionIterator::iterate_child_expr(*expr, collector);
-  };
-
-  RC rc = ExpressionIterator::iterate_child_expr(*having_predicate, collector);
-  if (OB_FAIL(rc)) {
-    return rc;
-  }
-
-  for (unique_ptr<Expression> &expression : exprs) {
-    rc = binder.bind_expression(expression, group_by_expressions);
-    if (OB_FAIL(rc)) {
-      LOG_INFO("bind expression failed. rc=%s", strrc(rc));
-    }
-  }
   return RC::SUCCESS;
 }
