@@ -110,6 +110,12 @@ CastExpr::~CastExpr() {}
 RC CastExpr::cast(const Value &value, Value &cast_value) const
 {
   RC rc = RC::SUCCESS;
+  if (value.is_null()) {
+    cast_value.set_type(cast_type_);
+    cast_value.set_null(true);
+    return rc;
+  }
+
   if (this->value_type() == value.attr_type()) {
     cast_value = value;
     return rc;
@@ -356,9 +362,8 @@ RC ComparisonExpr::comp_in_handler(const Tuple &tuple, Value &value) const
 
     value.set_boolean(false);
     return rc == RC::RECORD_EOF ? RC::SUCCESS : rc;
-  }
-  else {
-    for (const auto& right_value: subquyer_expr->values()) {
+  } else {
+    for (const auto &right_value : subquyer_expr->values()) {
       bool result = left_value.compare(right_value) == 0;
       if (result) {
         value.set_boolean(true);
@@ -374,6 +379,80 @@ RC ComparisonExpr::comp_notin_handler(const Tuple &tuple, Value &value) const
 {
   RC rc = comp_in_handler(tuple, value);
   value.set_boolean(!value.get_boolean());
+  return rc;
+}
+
+RC ComparisonExpr::to_compareable()
+{
+  RC rc = RC::SUCCESS;
+  if (left_ == nullptr || right_ == nullptr) {
+    return rc;
+  }
+
+  if (left_->type() == ExprType::SUBQUERY || right_->type() == ExprType::SUBQUERY) {
+    return rc;
+  }
+
+  if (left_->type() == ExprType::VALUE) {
+    Value val;
+    if (OB_FAIL(rc = left_->try_get_value(val))) {
+      return rc;
+    }
+    if (val.is_null()) {
+      return rc;
+    }
+  }
+  if (right_->type() == ExprType::VALUE) {
+    Value val;
+    if (OB_FAIL(rc = right_->try_get_value(val))) {
+      return rc;
+    }
+    if (val.is_null()) {
+      return rc;
+    }
+  }
+
+  auto implicit_cast_cost = [](AttrType from, AttrType to) {
+    if (from == to) {
+      return 0;
+    }
+    return DataType::type_instance(from)->cast_cost(to);
+  };
+
+  auto make_comparable_expr = [](unique_ptr<Expression> &expr, AttrType target_type) -> RC {
+    RC       rc        = RC::SUCCESS;
+    ExprType type      = expr->type();
+    auto     cast_expr = make_unique<CastExpr>(std::move(expr), target_type);
+    if (type == ExprType::VALUE) {
+      Value val;
+      if (OB_FAIL(rc = cast_expr->try_get_value(val))) {
+        LOG_WARN("failed to get value from child", strrc(rc));
+        return rc;
+      }
+      expr = make_unique<ValueExpr>(val);
+    } else {
+      expr = std::move(cast_expr);
+    }
+    return RC::SUCCESS;
+  };
+
+  if (left_->value_type() != right_->value_type()) {
+    auto left_to_right_cost = implicit_cast_cost(left_->value_type(), right_->value_type());
+    auto right_to_left_cost = implicit_cast_cost(right_->value_type(), left_->value_type());
+    if (left_to_right_cost <= right_to_left_cost && left_to_right_cost != INT32_MAX) {
+      if (OB_FAIL(rc = make_comparable_expr(left_, right_->value_type()))) {
+        return rc;
+      }
+    } else if (right_to_left_cost < left_to_right_cost && right_to_left_cost != INT32_MAX) {
+      if (OB_FAIL(rc = make_comparable_expr(right_, left_->value_type()))) {
+        return rc;
+      }
+    } else {
+      rc = RC::UNSUPPORTED;
+      LOG_WARN("unsupported cast from %s to %s", attr_type_to_string(left_->value_type()), attr_type_to_string(right_->value_type()));
+      return rc;
+    }
+  }
   return rc;
 }
 

@@ -305,6 +305,12 @@ RC ExpressionBinder::bind_comparison_expression(
   }
 
   child_bound_expressions.clear();
+
+  // 在comparison的left和right绑定完成后，做to_compareable
+  if (OB_FAIL(rc = comparison_expr->to_compareable())) {
+    return rc;
+  }
+
   bound_expressions.emplace_back(std::move(expr));
   return RC::SUCCESS;
 }

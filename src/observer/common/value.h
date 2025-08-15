@@ -56,7 +56,7 @@ public:
   Value &operator=(const Value &other);
   Value &operator=(Value &&other);
 
-  bool operator==(const Value& other) const;
+  bool operator==(const Value &other) const;
 
   void reset();
 
@@ -109,7 +109,8 @@ public:
     return DataType::type_instance(result.attr_type())->negative(value, result);
   }
 
-  static RC hash(const Value &value, std::size_t &result) {
+  static RC hash(const Value &value, std::size_t &result)
+  {
     if (value.is_null()) {
       result = 0;
       return RC::SUCCESS;
@@ -119,24 +120,45 @@ public:
 
   static RC cast_to(const Value &value, AttrType to_type, Value &result)
   {
+    if (value.is_null()) {
+      switch (to_type) {
+        case AttrType::FLOATS: {
+          result = Value::default_float();
+          result.set_null(true);
+          return RC::SUCCESS;
+        }
+        case AttrType::DATES: {
+          result = Value::default_date();
+          result.set_null(true);
+          return RC::SUCCESS;
+        }
+        case AttrType::CHARS: {
+          result = Value::default_char();
+          result.set_null(true);
+          return RC::SUCCESS;
+        }
+        case AttrType::BITMAP: {
+          result = Value::default_bitmap();
+          result.set_null(true);
+          return RC::SUCCESS;
+        }
+        default: LOG_WARN("unsupported type %d", to_type); return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+      }
+    }
     return DataType::type_instance(value.attr_type())->cast_to(value, to_type, result);
   }
 
-  static Value default_integer() {
-    return Value(static_cast<int>(0));
-  }
-  static Value default_float() {
-    return Value(static_cast<float>(0));
-  }
-  static Value default_date() {
+  static Value default_integer() { return Value(static_cast<int>(0)); }
+  static Value default_float() { return Value(static_cast<float>(0)); }
+  static Value default_date()
+  {
     Value ret;
     ret.set_date(0);
     return ret;
   }
-  static Value default_char() {
-    return Value("a", 1);
-  }
-  static Value default_bitmap() {
+  static Value default_char() { return Value("a", 1); }
+  static Value default_bitmap()
+  {
     Value ret;
     ret.set_bitmap("0", 1);
     return ret;
@@ -169,7 +191,7 @@ public:
   bool   get_boolean() const;
   LobID  get_lob_id() const;
 
-  char* get_bitmap_data();
+  char *get_bitmap_data();
 
 public:
   void set_int(int val);

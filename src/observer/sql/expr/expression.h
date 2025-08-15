@@ -379,10 +379,10 @@ public:
     return ret;
   }
 
+  RC   to_compareable();
 private:
-
-  RC       comp_in_handler(const Tuple &tuple, Value &value) const;
-  RC       comp_notin_handler(const Tuple &tuple, Value &value) const;
+  RC   comp_in_handler(const Tuple &tuple, Value &value) const;
+  RC   comp_notin_handler(const Tuple &tuple, Value &value) const;
 
   CompOp                 comp_;
   unique_ptr<Expression> left_;
@@ -633,4 +633,3 @@ private:
   Type                   aggregate_type_;
   unique_ptr<Expression> child_;
 };
-

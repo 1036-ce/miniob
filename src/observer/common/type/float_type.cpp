@@ -48,7 +48,7 @@ RC FloatType::divide(const Value &left, const Value &right, Value &result) const
     // 设置为浮点数最大值是不正确的。通常的做法是设置为NULL，但是当前的miniob没有NULL概念，所以这里设置为浮点数最大值。
     // result.set_float(numeric_limits<float>::max());
     result.set_type(AttrType::FLOATS);
-    result.set_null(true); 
+    result.set_null(true);
   } else {
     result.set_float(left.get_float() / right.get_float());
   }
@@ -61,21 +61,57 @@ RC FloatType::negative(const Value &val, Value &result) const
   return RC::SUCCESS;
 }
 
-RC FloatType::hash(const Value &val, std::size_t& result) const {
+RC FloatType::hash(const Value &val, std::size_t &result) const
+{
   result = std::hash<float>{}(val.get_float());
   return RC::SUCCESS;
 }
 
+RC FloatType::cast_to(const Value &val, AttrType type, Value &result) const
+{
+  switch (type) {
+    case AttrType::INTS: {
+      float float_value = val.get_float();
+      result.set_int(static_cast<int>(float_value));
+      return RC::SUCCESS;
+    }
+    case AttrType::CHARS: {
+      RC     rc = RC::SUCCESS;
+      string str_val;
+      if (OB_FAIL(rc = to_string(val, str_val))) {
+        return rc;
+      }
+      result.set_string(str_val.data(), str_val.size());
+      return RC::SUCCESS;
+    }
+    default: LOG_WARN("unsupported type %d", type); return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+  }
+}
+
+int FloatType::cast_cost(AttrType type) {
+  switch (type) {
+    case AttrType::FLOATS:
+      return 0;
+    case AttrType::INTS: 
+      return 3;
+    case AttrType::CHARS:
+      return 3;
+    default:
+      return INT32_MAX;
+  }
+}
+
 RC FloatType::set_value_from_str(Value &val, const string &data) const
 {
-  RC                rc = RC::SUCCESS;
+  RC           rc = RC::SUCCESS;
   stringstream deserialize_stream;
   deserialize_stream.clear();
   deserialize_stream.str(data);
 
   float float_value;
   deserialize_stream >> float_value;
-  if (!deserialize_stream || !deserialize_stream.eof()) {
+  // if (!deserialize_stream || !deserialize_stream.eof()) {
+  if (!deserialize_stream) {
     rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
   } else {
     val.set_float(float_value);

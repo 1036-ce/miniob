@@ -30,52 +30,34 @@ int IntegerType::compare(const Value &left, const Value &right) const
 
 RC IntegerType::cast_to(const Value &val, AttrType type, Value &result) const
 {
-  if (val.is_null()) {
-    switch (type) {
-      case AttrType::FLOATS: {
-        result = Value::default_float();
-        result.set_null(true);
-        return RC::SUCCESS;
-      }
-      case AttrType::DATES: {
-        result = Value::default_date();
-        result.set_null(true);
-        return RC::SUCCESS;
-      }
-      case AttrType::CHARS: {
-        result = Value::default_char();
-        result.set_null(true);
-        return RC::SUCCESS;
-      }
-      case AttrType::BITMAP: {
-        result = Value::default_bitmap();
-        result.set_null(true);
-        return RC::SUCCESS;
-      }
-      default: LOG_WARN("unsupported type %d", type); return RC::SCHEMA_FIELD_TYPE_MISMATCH;
-    }
-  }
+  RC rc = RC::SUCCESS;
   switch (type) {
     case AttrType::FLOATS: {
       float float_value = val.get_int();
       result.set_float(float_value);
-      return RC::SUCCESS;
+      return rc;
+    }
+    case AttrType::CHARS: {
+      string str;
+      if (OB_FAIL(rc = to_string(val, str))) {
+        return rc;
+      }
+      result.set_string(str.data(), str.size());
+      return rc;
     }
     default: LOG_WARN("unsupported type %d", type); return RC::SCHEMA_FIELD_TYPE_MISMATCH;
   }
 }
 
-int IntegerType::cast_cost(AttrType type) {
+int IntegerType::cast_cost(AttrType type)
+{
   switch (type) {
-    case AttrType::INTS: 
-      return 0;
-    case AttrType::FLOATS:
-    case AttrType::CHARS:
+    case AttrType::INTS: return 0;
+    case AttrType::FLOATS: return 2;
+    case AttrType::CHARS: return 2;
     case AttrType::DATES:
     case AttrType::BITMAP:
-      return 2;
-    default:
-      return INT32_MAX;
+    default: return INT32_MAX;
   }
 }
 
@@ -97,7 +79,8 @@ RC IntegerType::multiply(const Value &left, const Value &right, Value &result) c
   return RC::SUCCESS;
 }
 
-RC IntegerType::divide(const Value &left, const Value &right, Value &result) const {
+RC IntegerType::divide(const Value &left, const Value &right, Value &result) const
+{
   if (right.get_float() > -EPSILON && right.get_float() < EPSILON) {
     result.set_type(AttrType::INTS);
     result.set_null(true);
@@ -113,7 +96,8 @@ RC IntegerType::negative(const Value &val, Value &result) const
   return RC::SUCCESS;
 }
 
-RC IntegerType::hash(const Value &val, std::size_t& result) const {
+RC IntegerType::hash(const Value &val, std::size_t &result) const
+{
   result = std::hash<int>{}(val.get_int());
   return RC::SUCCESS;
 }
@@ -126,7 +110,8 @@ RC IntegerType::set_value_from_str(Value &val, const string &data) const
   deserialize_stream.str(data);
   int int_value;
   deserialize_stream >> int_value;
-  if (!deserialize_stream || !deserialize_stream.eof()) {
+  // if (!deserialize_stream || !deserialize_stream.eof()) {
+  if (!deserialize_stream) {
     rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
   } else {
     val.set_int(int_value);

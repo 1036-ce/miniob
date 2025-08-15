@@ -12,6 +12,8 @@ See the Mulan PSL v2 for more details. */
 #include "common/log/log.h"
 #include "common/type/char_type.h"
 #include "common/type/date_type.h"
+#include "common/type/float_type.h"
+#include "common/type/integer_type.h"
 #include "common/value.h"
 
 int CharType::compare(const Value &left, const Value &right) const
@@ -21,7 +23,8 @@ int CharType::compare(const Value &left, const Value &right) const
       (void *)left.value_.pointer_value_, left.length_, (void *)right.value_.pointer_value_, right.length_);
 }
 
-RC CharType::hash(const Value &val, std::size_t& result) const {
+RC CharType::hash(const Value &val, std::size_t &result) const
+{
   result = std::hash<string>{}(val.get_string());
   return RC::SUCCESS;
 }
@@ -39,6 +42,12 @@ RC CharType::cast_to(const Value &val, AttrType type, Value &result) const
     case AttrType::DATES: {
       rc = DateType().set_value_from_str(result, val.value_.pointer_value_);
     } break;
+    case AttrType::INTS: {
+      rc = IntegerType().set_value_from_str(result, val.value_.pointer_value_);
+    } break;
+    case AttrType::FLOATS: {
+      rc = FloatType().set_value_from_str(result, val.value_.pointer_value_);
+    } break;
     default: return RC::UNIMPLEMENTED;
   }
   return rc;
@@ -47,12 +56,11 @@ RC CharType::cast_to(const Value &val, AttrType type, Value &result) const
 int CharType::cast_cost(AttrType type)
 {
   switch (type) {
-    case AttrType::CHARS: 
-      return 0;
-    case AttrType::DATES:
-      return 1;
-    default:
-      return INT32_MAX;
+    case AttrType::CHARS: return 0;
+    case AttrType::DATES: return 1;
+    case AttrType::INTS: return 1;
+    case AttrType::FLOATS: return 1;
+    default: return INT32_MAX;
   }
 }
 
