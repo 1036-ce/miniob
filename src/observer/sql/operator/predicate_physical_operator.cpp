@@ -26,11 +26,105 @@ PredicatePhysicalOperator::PredicatePhysicalOperator(std::unique_ptr<Expression>
 RC PredicatePhysicalOperator::open(Trx *trx)
 {
   ASSERT(children_.size() == 1, "predicate_physical_operator's children must have one child");
+  reset();
   trx_  = trx;
   RC rc = RC::SUCCESS;
   if (OB_FAIL(rc = children_.front()->open(trx))) {
     return rc;
   }
+
+  for (auto subquery : subqueries_) {
+    if (subquery->physical_oper()) {
+      should_pre_execute_ = true;
+      break;
+    }
+  }
+
+  /* if (OB_FAIL(rc = init_subqueries(trx))) {
+   *   return rc;
+   * } */
+  if (should_pre_execute_) {
+    if (OB_FAIL(rc = init_subqueries())) {
+      return rc;
+    }
+    if (OB_FAIL(rc = pre_execute())) {
+      return rc;
+    }
+    iter_       = 0;
+    first_emit_ = true;
+    children_.front()->close();
+  }
+  return rc;
+}
+
+RC PredicatePhysicalOperator::next()
+{
+  RC rc = RC::SUCCESS;
+  if (should_pre_execute_) {
+    if (first_emit_) {
+      first_emit_ = false;
+      if (iter_ == tuples_.size()) {
+        return RC::RECORD_EOF;
+      }
+      return RC::SUCCESS;
+    }
+
+    ++iter_;
+    if (iter_ == tuples_.size()) {
+      return RC::RECORD_EOF;
+    }
+    return RC::SUCCESS;
+  } else {
+    PhysicalOperator *non_subquery_child = children_.front().get();
+    while (OB_SUCC(rc = non_subquery_child->next())) {
+      Tuple *tuple = non_subquery_child->current_tuple();
+      if (nullptr == tuple) {
+        LOG_WARN("failed to get tuple from operator");
+        return RC::INTERNAL;
+      }
+
+      Value value;
+      if (OB_FAIL(rc = expression_->get_value(*tuple, value))) {
+        return rc;
+      }
+      if (value.get_boolean()) {
+        return rc;
+      }
+    }
+    return rc;
+  }
+  /*   RC                rc                 = RC::SUCCESS;
+   *   PhysicalOperator *non_subquery_child = children_.front().get();
+   *
+   *   while (RC::SUCCESS == (rc = non_subquery_child->next())) {
+   *     Tuple *tuple = non_subquery_child->current_tuple();
+   *     if (nullptr == tuple) {
+   *       rc = RC::INTERNAL;
+   *       LOG_WARN("failed to get tuple from operator");
+   *       break;
+   *     }
+   *
+   *     Value value;
+   *     if (OB_FAIL(rc = open_correlated_subquery())) {
+   *       return rc;
+   *     }
+   *     if (OB_FAIL(rc = expression_->get_value(*tuple, value))) {
+   *       return rc;
+   *     }
+   *     if (OB_FAIL(close_correlated_subquery())) {
+   *       return rc;
+   *     }
+   *
+   *     if (value.get_boolean()) {
+   *       return rc;
+   *     }
+   *   }
+   *   return rc; */
+}
+
+RC PredicatePhysicalOperator::init_subqueries()
+{
+  RC rc = RC::SUCCESS;
   for (auto subquery : subqueries_) {
 
     if (!subquery->physical_oper()) {
@@ -47,7 +141,7 @@ RC PredicatePhysicalOperator::open(Trx *trx)
     }
 
     if (!subquery->is_correlated()) {
-      if (OB_FAIL(rc = subquery->run_uncorrelated_query(trx))) {
+      if (OB_FAIL(rc = subquery->run_uncorrelated_query(trx_))) {
         return rc;
       }
       auto cmp_expr = find_subquery_parent(subquery);
@@ -56,12 +150,35 @@ RC PredicatePhysicalOperator::open(Trx *trx)
         return RC::UNSUPPORTED;
       }
     }
-
   }
   return rc;
 }
 
-RC PredicatePhysicalOperator::next()
+RC PredicatePhysicalOperator::pre_execute()
+{
+  RC                rc                 = RC::SUCCESS;
+  PhysicalOperator *non_subquery_child = children_.front().get();
+
+  while (OB_SUCC(rc = next_aux())) {
+    Tuple *tuple = non_subquery_child->current_tuple();
+    if (nullptr == tuple) {
+      LOG_WARN("failed to get tuple from operator");
+      return RC::INTERNAL;
+    }
+
+    ValueListTuple valuelist_tuple;
+    if (OB_FAIL(rc = ValueListTuple::make(*tuple, valuelist_tuple))) {
+      return rc;
+    }
+    tuples_.push_back(valuelist_tuple);
+  }
+  /* for (auto& tuple: tuples_) {
+   *   LOG_WARN("%s", tuple.to_string().c_str());
+   * } */
+  return rc == RC::RECORD_EOF ? RC::SUCCESS : rc;
+}
+
+RC PredicatePhysicalOperator::next_aux()
 {
   RC                rc                 = RC::SUCCESS;
   PhysicalOperator *non_subquery_child = children_.front().get();
@@ -75,7 +192,7 @@ RC PredicatePhysicalOperator::next()
     }
 
     Value value;
-    if (OB_FAIL(rc = open_correlated_subquery())) {
+    if (OB_FAIL(rc = open_correlated_subquery(tuple))) {
       return rc;
     }
     if (OB_FAIL(rc = expression_->get_value(*tuple, value))) {
@@ -92,23 +209,40 @@ RC PredicatePhysicalOperator::next()
   return rc;
 }
 
-RC PredicatePhysicalOperator::close()
-{
-  RC rc = children_.back()->close();
-  return rc;
+void PredicatePhysicalOperator::reset() {
+  should_pre_execute_ = false;
+  tuples_.clear();
+  iter_ = 0;
+  first_emit_ = true;
 }
 
-Tuple *PredicatePhysicalOperator::current_tuple() { return children_.front()->current_tuple(); }
+RC PredicatePhysicalOperator::close()
+{
+  if (!should_pre_execute_) {
+    return children_.front()->close();
+  }
+  return RC::SUCCESS;
+}
+
+Tuple *PredicatePhysicalOperator::current_tuple()
+{
+  if (should_pre_execute_) {
+    return &tuples_.at(iter_);
+  } else {
+    return children_.front()->current_tuple();
+  }
+}
 
 RC PredicatePhysicalOperator::tuple_schema(TupleSchema &schema) const { return children_.back()->tuple_schema(schema); }
 
-RC PredicatePhysicalOperator::open_correlated_subquery()
+RC PredicatePhysicalOperator::open_correlated_subquery(Tuple *env_tuple)
 {
   RC rc = RC::SUCCESS;
-  for (auto subquery: subqueries_) {
+  for (auto subquery : subqueries_) {
     if (subquery->is_correlated()) {
-      auto& physical_oper = subquery->physical_oper();
-      physical_oper->set_env_tuple(current_tuple());
+      auto &physical_oper = subquery->physical_oper();
+      // physical_oper->set_env_tuple(current_tuple());
+      physical_oper->set_env_tuple(env_tuple);
       if (OB_FAIL(rc = physical_oper->open(trx_))) {
         return rc;
       }
@@ -120,9 +254,9 @@ RC PredicatePhysicalOperator::open_correlated_subquery()
 RC PredicatePhysicalOperator::close_correlated_subquery()
 {
   RC rc = RC::SUCCESS;
-  for (auto subquery: subqueries_) {
+  for (auto subquery : subqueries_) {
     if (subquery->is_correlated()) {
-      auto& physical_oper = subquery->physical_oper();
+      auto &physical_oper = subquery->physical_oper();
       physical_oper->set_env_tuple(nullptr);
       if (OB_FAIL(rc = physical_oper->close())) {
         return rc;

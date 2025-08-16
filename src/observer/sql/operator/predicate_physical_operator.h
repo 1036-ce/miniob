@@ -48,12 +48,20 @@ public:
   }
 
 private:
+  RC init_subqueries();
+  RC pre_execute();
+  RC next_aux();
+  void reset();
 
-  RC open_correlated_subquery();
+  RC open_correlated_subquery(Tuple* env_tuple);
   RC close_correlated_subquery();
   ComparisonExpr* find_subquery_parent(SubQueryExpr* subquery);
 
   unique_ptr<Expression> expression_;
-
   std::vector<SubQueryExpr*> subqueries_;
+
+  bool should_pre_execute_{false};
+  vector<ValueListTuple>      tuples_;
+  size_t iter_;
+  bool first_emit_;
 };

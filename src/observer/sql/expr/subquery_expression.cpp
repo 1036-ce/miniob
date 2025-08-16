@@ -59,7 +59,7 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
     rc = physical_oper_->next();
     if (rc != RC::RECORD_EOF) {
       LOG_WARN("subquery return more than one line");
-      return rc;
+      return RC::INTERNAL;
     }
 
     return RC::SUCCESS;
@@ -67,7 +67,7 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
   else {
     if (values_.size() > 1) {
       LOG_WARN("subquery return more than one line");
-      return RC::UNSUPPORTED;
+      return RC::INTERNAL;
     }
     if (values_.empty()) {
       value.set_null(true);

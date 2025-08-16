@@ -331,7 +331,7 @@ RC ComparisonExpr::comp_in_handler(const Tuple &tuple, Value &value) const
   if (subquyer_expr->is_correlated()) {
     // phy_oper has been opened
     auto &phy_oper = subquyer_expr->physical_oper();
-    phy_oper->set_env_tuple(&tuple);
+    // phy_oper->set_env_tuple(&tuple);
 
     while (true) {
       rc = phy_oper->next();
