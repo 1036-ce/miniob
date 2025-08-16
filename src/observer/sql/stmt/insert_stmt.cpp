@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/stmt/insert_stmt.h"
+#include "common/config.h"
 #include "common/log/log.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
@@ -53,6 +54,18 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
     const FieldMeta *field_meta = table_meta.field(i);
     if (!field_meta->nullable() && values[i - unvisible_field_num].is_null()) {
       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
+  }
+
+  // check text length
+  for (int i = unvisible_field_num; i < table_meta.field_num(); ++i) {
+    const AttrType field_type = table_meta.field(i)->type();
+    const Value& value = values[i - unvisible_field_num];
+    if (field_type == AttrType::TEXT && value.attr_type() == AttrType::CHARS) {
+      if (value.length() > TEXT_MAX_SIZE) {
+        LOG_WARN("This string is too long");
+        return RC::INVALID_ARGUMENT;
+      }
     }
   }
 

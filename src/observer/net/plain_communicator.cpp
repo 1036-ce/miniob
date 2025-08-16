@@ -76,13 +76,16 @@ RC PlainCommunicator::read_event(SessionEvent *&event)
 
   if (data_len > max_packet_size) {
     LOG_WARN("The length of sql exceeds the limitation %d", max_packet_size);
+    printf("The length of sql exceeds the limitation %d", max_packet_size);
     return RC::IOERR_TOO_LONG;
   }
   if (read_len == 0) {
     LOG_INFO("The peer has been closed %s", addr());
+    printf("The peer has been closed %s", addr());
     return RC::IOERR_CLOSE;
   } else if (read_len < 0) {
     LOG_ERROR("Failed to read socket of %s, %s", addr(), strerror(errno));
+    printf("Failed to read socket of %s, %s", addr(), strerror(errno));
     return RC::IOERR_READ;
   }
 
