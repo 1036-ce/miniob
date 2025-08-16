@@ -64,7 +64,7 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
     if (field_type == AttrType::TEXT && value.attr_type() == AttrType::CHARS) {
       if (value.length() > TEXT_MAX_SIZE) {
         LOG_WARN("This string is too long");
-        return RC::IOERR_TOO_LONG;
+        return RC::INVALID_ARGUMENT;
       }
     }
   }
