@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/stmt/update_stmt.h"
+#include "common/config.h"
 #include "common/log/log.h"
 #include "sql/expr/expression.h"
 #include "sql/parser/expression_binder.h"
@@ -72,13 +73,23 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
     }
 
     // 如果当前字段不能为null,但是却要更新为null, 返回错误
+    // check null and text length
     Value tmp;
     if (OB_SUCC(rc = target_expressions.back()->try_get_value(tmp))) {
       if (tmp.is_null() && !field_meta->nullable()) {
         LOG_WARN("Field '%s' can not be null", field_meta->name());
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
+
+      // check text length
+      if (field_meta->type() == AttrType::TEXT && tmp.attr_type() == AttrType::CHARS) {
+        if (tmp.length() > TEXT_MAX_SIZE) {
+          LOG_WARN("This string is too long");
+          return RC::IOERR_TOO_LONG;
+        }
+      }
     }
+
   }
 
 
