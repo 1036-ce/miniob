@@ -44,11 +44,17 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
   if (is_correlated_) {
     // physical_oper_ has been opened
     if (OB_FAIL(rc = physical_oper_->next())) {
+      if (rc == RC::RECORD_EOF) {
+        value.set_null(true);
+        return RC::SUCCESS;
+      }
       return rc;
     }
 
     Tuple *subquery_tuple = physical_oper_->current_tuple();
-    subquery_tuple->cell_at(0, value);
+    if (OB_FAIL(rc = subquery_tuple->cell_at(0, value))) {
+      return rc;
+    }
 
     rc = physical_oper_->next();
     if (rc != RC::RECORD_EOF) {
