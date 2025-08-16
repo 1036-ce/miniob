@@ -5,6 +5,9 @@ RC SubQueryExpr::build_select_stmt(BinderContext& binder_context)
 {
   RC    rc   = RC::SUCCESS;
   Stmt *stmt = nullptr;
+  if (sql_node_ == nullptr) {
+    return rc;
+  }
 
   BinderContext sub_binder_context;
   sub_binder_context.set_db(binder_context.db());

@@ -56,6 +56,11 @@ SubQueryExpr *create_subquery_expression(ParsedSqlNode* sql_node, const char *sq
  return expr;
 }
 
+SubQueryExpr *create_subquery_expression(const vector<Value>& value_list) {
+ SubQueryExpr *expr = new SubQueryExpr(value_list);
+ return expr;
+}
+
 %}
 
 %define api.pure full
@@ -137,6 +142,7 @@ SubQueryExpr *create_subquery_expression(ParsedSqlNode* sql_node, const char *sq
 %union {
   ParsedSqlNode *                            sql_node;
   Value *                                    value;
+  vector<Value>*                             value_list;
   enum CompOp                                comp;
   RelAttrSqlNode *                           rel_attr;
   vector<AttrInfoSqlNode> *                  attr_infos;
@@ -167,9 +173,11 @@ SubQueryExpr *create_subquery_expression(ParsedSqlNode* sql_node, const char *sq
 %type <boolean>             null_opt;
 %type <number>              type
 %type <value>               value
+%type <value_list>          value_list
 %type <number>              number
 %type <cstring>             relation
 %type <comp>                comp_op
+%type <comp>                in_opt
 %type <rel_attr>            rel_attr
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
@@ -492,6 +500,34 @@ value:
       @$ = @1;
     }
     ;
+
+value_list:
+    expression 
+    {
+      $$ = new vector<Value>;
+      Value val;
+      if (OB_FAIL($1->try_get_value(val))) {
+        YYERROR;
+      }
+      $$->emplace_back(val);
+      delete $1;
+    }
+    | expression COMMA value_list 
+    {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new vector<Value>;
+      }
+      Value val;
+      if (OB_FAIL($1->try_get_value(val))) {
+        YYERROR;
+      }
+      $$->emplace($$->begin(), val);
+      delete $1;
+    }
+    ;
+
 storage_format:
     /* empty */
     {
@@ -639,8 +675,16 @@ predicate:
     }
     // | bit_expr LIKE simple_expr {
     // }
-    // | bit_expr IN expression_list {
-    // }
+    | bit_expr in_opt LBRACE value_list RBRACE {
+      SubQueryExpr* subquery_expr = create_subquery_expression(*$4);
+      $$ = new ComparisonExpr($2, $1, subquery_expr);
+      $$->set_name(token_name(sql_string, &@$));
+      delete $4;
+    }
+    | bit_expr in_opt subquery_expr {
+      $$ = new ComparisonExpr($2, $1, $3);
+      $$->set_name(token_name(sql_string, &@$));
+    }
     ;
 
 
@@ -770,7 +814,12 @@ comp_op:
     | NE { $$ = NOT_EQUAL; }
     | IS_T { $$ = IS; }
     | IS_T NOT { $$ = IS_NOT; }
-    | IN_T { $$ = IN; }
+    // | IN_T { $$ = IN; }
+    // | NOT IN_T { $$ = NOT_IN; }
+    ;
+
+in_opt:
+    IN_T { $$ = IN; }
     | NOT IN_T { $$ = NOT_IN; }
     ;
 

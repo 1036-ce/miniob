@@ -219,30 +219,15 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
   vector<SubQueryExpr *>           subqueries;
   vector<unique_ptr<Expression> *> exprs;
 
-  /* auto make_comparable_expr = [](unique_ptr<Expression> &expr, AttrType target_type) -> RC {
-   *   RC       rc        = RC::SUCCESS;
-   *   ExprType type      = expr->type();
-   *   auto     cast_expr = make_unique<CastExpr>(std::move(expr), target_type);
-   *   if (type == ExprType::VALUE) {
-   *     Value val;
-   *     if (OB_FAIL(rc = cast_expr->try_get_value(val))) {
-   *       LOG_WARN("failed to get value from child", strrc(rc));
-   *       return rc;
-   *     }
-   *     expr = make_unique<ValueExpr>(val);
-   *   } else {
-   *     expr = std::move(cast_expr);
-   *   }
-   *   return RC::SUCCESS;
-   * }; */
-
   auto subquery_handle = [&](unique_ptr<Expression> &subquery_expr) -> RC {
     SubQueryExpr               *expr = static_cast<SubQueryExpr *>(subquery_expr.get());
-    unique_ptr<LogicalOperator> logical_oper;
-    if (OB_FAIL(rc = create_plan(expr->select_stmt().get(), logical_oper))) {
-      return rc;
+    if (expr->select_stmt()) {
+      unique_ptr<LogicalOperator> logical_oper;
+      if (OB_FAIL(rc = create_plan(expr->select_stmt().get(), logical_oper))) {
+        return rc;
+      }
+      expr->set_logical_oper(std::move(logical_oper));
     }
-    expr->set_logical_oper(std::move(logical_oper));
     subqueries.push_back(expr);
     return RC::SUCCESS;
   };
@@ -279,23 +264,6 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
       continue;
     }
 
-    /* if (left->value_type() != right->value_type()) {
-     *   auto left_to_right_cost = implicit_cast_cost(left->value_type(), right->value_type());
-     *   auto right_to_left_cost = implicit_cast_cost(right->value_type(), left->value_type());
-     *   if (left_to_right_cost <= right_to_left_cost && left_to_right_cost != INT32_MAX) {
-     *     if (OB_FAIL(rc = make_comparable_expr(left, right->value_type()))) {
-     *       return rc;
-     *     }
-     *   } else if (right_to_left_cost < left_to_right_cost && right_to_left_cost != INT32_MAX) {
-     *     if (OB_FAIL(rc = make_comparable_expr(right, left->value_type()))) {
-     *       return rc;
-     *     }
-     *   } else {
-     *     rc = RC::UNSUPPORTED;
-     *     LOG_WARN("unsupported cast from %s to %s", attr_type_to_string(left->value_type()), attr_type_to_string(right->value_type()));
-     *     return rc;
-     *   }
-     * } */
   }
 
   logical_operator = make_unique<PredicateLogicalOperator>(std::move(filter_stmt->predicate()), subqueries);

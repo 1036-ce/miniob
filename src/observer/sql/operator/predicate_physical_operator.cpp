@@ -33,6 +33,10 @@ RC PredicatePhysicalOperator::open(Trx *trx)
   }
   for (auto subquery : subqueries_) {
 
+    if (!subquery->physical_oper()) {
+      continue;
+    }
+
     TupleSchema schema;
     if (OB_FAIL(rc = subquery->physical_oper()->tuple_schema(schema))) {
       return rc;

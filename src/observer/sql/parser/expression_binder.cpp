@@ -508,14 +508,20 @@ RC ExpressionBinder::bind_aggregate_expression(
 }
 
 RC ExpressionBinder::bind_subquery_expression(
-    unique_ptr<Expression> &subquery_expr, vector<unique_ptr<Expression>> &bound_expressions) {
-  RC rc = RC::SUCCESS;
-  auto expr = static_cast<SubQueryExpr*>(subquery_expr.get());
-  SubQueryExpr *ret = new SubQueryExpr{expr->sql_node().release()};
-  // if (OB_FAIL(rc = ret->build_select_stmt(context_.db(), context_.query_tables()))) {
-  if (OB_FAIL(rc = ret->build_select_stmt(context_))) {
-    return rc;
+    unique_ptr<Expression> &subquery_expr, vector<unique_ptr<Expression>> &bound_expressions)
+{
+  RC            rc   = RC::SUCCESS;
+  auto          expr = static_cast<SubQueryExpr *>(subquery_expr.get());
+  SubQueryExpr *ret  = nullptr;
+  if (expr->sql_node()) {
+    ret = new SubQueryExpr{expr->sql_node().release()};
+    // if (OB_FAIL(rc = ret->build_select_stmt(context_.db(), context_.query_tables()))) {
+    if (OB_FAIL(rc = ret->build_select_stmt(context_))) {
+      return rc;
+    }
+  } else {
+    ret = new SubQueryExpr{expr->values()};
   }
-  bound_expressions.emplace_back(ret); 
+  bound_expressions.emplace_back(ret);
   return rc;
 }

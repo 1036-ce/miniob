@@ -107,3 +107,26 @@ select * from ssq_1 where col1 in (select * from ssq_2);
 FAILURE
 select * from ssq_1 where col1 not in (select * from ssq_2);
 FAILURE
+
+4. PURE VALUE SUBQUERY
+SELECT * FROM SSQ_1 WHERE ID IN (1,2,3);
+1 | 4 | 11.2
+2 | 2 | 12
+3 | 3 | 13.5
+ID | COL1 | FEAT1
+SELECT * FROM SSQ_1 WHERE ID IN (1,2);
+1 | 4 | 11.2
+2 | 2 | 12
+ID | COL1 | FEAT1
+SELECT * FROM SSQ_1 WHERE ID IN (1);
+1 | 4 | 11.2
+ID | COL1 | FEAT1
+SELECT * FROM SSQ_1 WHERE ID IN (4);
+ID | COL1 | FEAT1
+SELECT * FROM SSQ_1 WHERE ID IN (4,3);
+3 | 3 | 13.5
+ID | COL1 | FEAT1
+SELECT * FROM SSQ_1 WHERE ID IN (4,3,2);
+2 | 2 | 12
+3 | 3 | 13.5
+ID | COL1 | FEAT1

@@ -263,12 +263,14 @@ RC PhysicalPlanGenerator::create_plan(
 
   // create all subquery operator
   for (const auto &expr : subquey_exprs) {
-    unique_ptr<PhysicalOperator> phy_oper;
-    if (OB_FAIL(rc = create(*expr->logical_oper(), phy_oper, session))) {
-      LOG_WARN("failed to create plan for a subquery. rc = %s", strrc(rc));
-      return rc;
+    if (expr->logical_oper()) {
+      unique_ptr<PhysicalOperator> phy_oper;
+      if (OB_FAIL(rc = create(*expr->logical_oper(), phy_oper, session))) {
+        LOG_WARN("failed to create plan for a subquery. rc = %s", strrc(rc));
+        return rc;
+      }
+      expr->set_physical_oper(std::move(phy_oper));
     }
-    expr->set_physical_oper(std::move(phy_oper));
     pred_phy_oper->add_subquery(expr);
   }
 
@@ -497,11 +499,13 @@ RC PhysicalPlanGenerator::create_plan(
   return rc;
 }
 
-RC PhysicalPlanGenerator::create_plan(OrderByLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper, Session *session) {
+RC PhysicalPlanGenerator::create_plan(
+    OrderByLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper, Session *session)
+{
   RC rc = RC::SUCCESS;
   ASSERT(logical_oper.children().size() == 1, "order by operator should have 1 child");
 
-  vector<unique_ptr<OrderBy>>& orderbys = logical_oper.orderbys();
+  vector<unique_ptr<OrderBy>>        &orderbys      = logical_oper.orderbys();
   unique_ptr<OrderByPhysicalOperator> order_by_oper = make_unique<OrderByPhysicalOperator>(std::move(orderbys));
 
   LogicalOperator             &child_oper = *logical_oper.children().front();

@@ -44,3 +44,11 @@ select * from ssq_1 where col1 = (select ssq_2.col2 from ssq_2);
 select * from ssq_1 where col1 = (select * from ssq_2);
 select * from ssq_1 where col1 in (select * from ssq_2);
 select * from ssq_1 where col1 not in (select * from ssq_2);
+
+--echo 4. pure value subquery
+--sort select * from ssq_1 where id in (1,2,3);
+--sort select * from ssq_1 where id in (1,2);
+--sort select * from ssq_1 where id in (1);
+--sort select * from ssq_1 where id in (4);
+--sort select * from ssq_1 where id in (4,3);
+--sort select * from ssq_1 where id in (4,3,2);
