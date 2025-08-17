@@ -229,15 +229,16 @@ auto SelectStmt::collect_tables(
     }
 
     table_map.insert({table_name, table});
+    binder_context.add_current_table(table);
     if (!single_table->alias_name.empty()) {
       const char* alias_name = single_table->alias_name.c_str();
       if (table_map.contains(alias_name)) {
         return RC::INVALID_ARGUMENT;
       }
       table_map.insert({alias_name, table});
+      binder_context.add_current_table(alias_name, table);
     }
     
-    binder_context.add_table(table);
     return RC::SUCCESS;
   }
 

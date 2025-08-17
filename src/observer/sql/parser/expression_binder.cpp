@@ -47,7 +47,7 @@ Table *BinderContext::find_table(const char *table_name) const
     return nullptr;
   }
   Table* target = table_map_.at(table_name);
-  for (auto table: query_tables_) {
+  for (auto table: current_query_tables_) {
     if (table == target) {
       return table;
     }
@@ -173,12 +173,12 @@ RC ExpressionBinder::bind_star_expression(
 
     tables_to_wildcard.push_back(table);
   } else {
-    const vector<Table *> &all_tables = context_.query_tables();
+    const vector<Table *> &all_tables = context_.current_query_tables();
     tables_to_wildcard.insert(tables_to_wildcard.end(), all_tables.begin(), all_tables.end());
   }
 
   for (Table *table : tables_to_wildcard) {
-    wildcard_fields(table, bound_expressions, context_.query_tables().size());
+    wildcard_fields(table, bound_expressions, context_.current_query_tables().size());
   }
 
   return RC::SUCCESS;
@@ -198,12 +198,12 @@ RC ExpressionBinder::bind_unbound_field_expression(
 
   Table *table = nullptr;
   if (is_blank(table_name)) {
-    if (context_.query_tables().size() != 1) {
+    if (context_.current_query_tables().size() != 1) {
       LOG_INFO("cannot determine table for field: %s", field_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
 
-    table = context_.query_tables()[0];
+    table = context_.current_query_tables()[0];
   } else {
     table = context_.find_table(table_name);
     if (nullptr == table) {
@@ -219,7 +219,7 @@ RC ExpressionBinder::bind_unbound_field_expression(
   }
 
   if (0 == strcmp(field_name, "*")) {
-    wildcard_fields(table, bound_expressions, context_.query_tables().size());
+    wildcard_fields(table, bound_expressions, context_.current_query_tables().size());
   } else {
     const FieldMeta *field_meta = table->table_meta().field(field_name);
     if (nullptr == field_meta) {
@@ -235,7 +235,7 @@ RC ExpressionBinder::bind_unbound_field_expression(
     }
     else {
       // 如果一个查询中涉及到2个或以上表，schema中需要给出表名
-      if (context_.query_tables().size() > 1) {
+      if (context_.current_query_tables().size() > 1) {
         field_expr->set_name(unbound_field_expr->name());
       } else {
         field_expr->set_name(field_name);

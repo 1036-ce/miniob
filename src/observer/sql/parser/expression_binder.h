@@ -22,10 +22,13 @@ public:
   BinderContext()          = default;
   virtual ~BinderContext() = default;
 
-  void add_table(Table *table)
+  void add_current_table(Table *table)
   {
-    query_tables_.push_back(table);
     table_map_.insert({table->name(), table});
+    if (!unique_tables_.contains(table)) {
+      current_query_tables_.push_back(table);
+      unique_tables_.insert(table);
+    }
   }
   void add_outer_table(Table *table)
   {
@@ -36,14 +39,20 @@ public:
     used_outer_tables_.push_back(table);
   }
 
-  void add_table(const string &alias_name, Table *table)
+  void add_current_table(const string &alias_name, Table *table)
   {
-    query_tables_.push_back(table);
-    table_map_.insert({alias_name, table});
+    /* current_query_tables_.push_back(table);
+     * table_map_.insert({alias_name, table});
+     * unique_tables_.insert(table); */
+    table_map_.insert({table->name(), table});
+    if (!unique_tables_.contains(table)) {
+      current_query_tables_.push_back(table);
+      unique_tables_.insert(table);
+    }
   }
 
-  void clear_table() { 
-    query_tables_.clear(); 
+  void clear_current_table() { 
+    current_query_tables_.clear(); 
     table_map_.clear();
   }
   void clear_outer_table() { outer_query_tables_.clear(); } 
@@ -51,7 +60,7 @@ public:
   Table *find_table(const char *table_name) const;
   Table *find_outer_table(const char *table_name) const;
 
-  const vector<Table *> &query_tables() const { return query_tables_; }
+  const vector<Table *> &current_query_tables() const { return current_query_tables_; }
   const vector<Table *> &outer_query_tables() const { return outer_query_tables_; }
   const vector<Table *> &used_outer_tables() const { return used_outer_tables_; }
 
@@ -62,8 +71,9 @@ public:
     BinderContext sub_context;
     sub_context.db_ = this->db_;
     sub_context.table_map_ = this->table_map_;
+    sub_context.unique_tables_ = this->unique_tables_;
     sub_context.outer_query_tables_ = this->outer_query_tables_;
-    for (auto table: this->query_tables_) {
+    for (auto table: this->current_query_tables_) {
       sub_context.outer_query_tables_.push_back(table);
     }
     sub_context.used_outer_tables_.clear();
@@ -72,7 +82,7 @@ public:
 
 private:
   Db             *db_ = nullptr;
-  vector<Table *> query_tables_;
+  vector<Table *> current_query_tables_;
   vector<Table *> outer_query_tables_;
   vector<Table *> used_outer_tables_;
 
@@ -92,6 +102,7 @@ private:
   };
 
   unordered_map<string, Table *, Hash, EqualTo> table_map_;
+  unordered_set<Table*> unique_tables_;
 };
 
 /**
