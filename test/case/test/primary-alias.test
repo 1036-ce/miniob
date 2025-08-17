@@ -1,0 +1,21 @@
+CREATE TABLE t_alias_1(id int, col1 int, feat1 float);
+CREATE TABLE t_alias_2(id int, col2 int, feat2 float);
+
+INSERT INTO t_alias_1 VALUES (1, 4, 11.2);
+INSERT INTO t_alias_1 VALUES (2, 2, 12.0);
+INSERT INTO t_alias_1 VALUES (3, 3, 13.5);
+INSERT INTO t_alias_2 VALUES (1, 2, 13.0);
+INSERT INTO t_alias_2 VALUES (2, 7, 10.5);
+INSERT INTO t_alias_2 VALUES (5, 3, 12.6);
+
+select id as ii from t_alias_1;
+select id ii from t_alias_1;
+select id ii, col1 as c1 from t_alias_1;
+select id ii, col1 c1 from t_alias_1;
+select id ii, col1 c1, feat1 as f1 from t_alias_1;
+select id * 2 + 3 ii, col1 c1, feat1 as f1 from t_alias_1;
+
+select min(id) as m_id from t_alias_1;
+select min(id) as m_id from t_alias_1 group by id;
+
+select * from table_alias_1 t1 where id in (select t2.id from table_alias_2 t2 where t2.col2 >= t1.col1);

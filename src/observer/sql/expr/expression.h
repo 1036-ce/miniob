@@ -119,6 +119,9 @@ public:
   virtual const char *name() const { return name_.c_str(); }
   virtual void        set_name(string name) { name_ = name; }
 
+  virtual const string &alias_name() const { return alias_name_; }
+  virtual void          set_alias_name(string alias_name) { alias_name_ = alias_name; }
+
   /**
    * @brief 表达式在下层算子返回的 chunk 中的位置
    */
@@ -148,6 +151,7 @@ protected:
 
 private:
   string name_;
+  string alias_name_;
 };
 
 class StarExpr : public Expression
@@ -385,7 +389,7 @@ private:
   RC comp_in_handler(const Tuple &tuple, Value &value) const;
   RC comp_notin_handler(const Tuple &tuple, Value &value) const;
 
-  bool match(const string& target, const string& pattern) const;
+  bool match(const string &target, const string &pattern) const;
 
   CompOp                 comp_;
   unique_ptr<Expression> left_;

@@ -131,6 +131,7 @@ SubQueryExpr *create_subquery_expression(const vector<Value>& value_list) {
         ORDER_T
         TEXT_T
         LIKE_T
+        AS_T
         HAVING_T
         EQ
         LT
@@ -180,6 +181,7 @@ SubQueryExpr *create_subquery_expression(const vector<Value>& value_list) {
 %type <comp>                comp_op
 %type <comp>                in_opt
 %type <comp>                like_opt
+%type <cstring>             alias_opt
 %type <rel_attr>            rel_attr
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
@@ -631,17 +633,23 @@ calc_stmt:
     ;
 
 expression_list:
-    expression
+    expression alias_opt
     {
+      if ($2 != nullptr) {
+        $1->set_alias_name($2);
+      }
       $$ = new vector<unique_ptr<Expression>>;
       $$->emplace_back($1);
     }
-    | expression COMMA expression_list
+    | expression alias_opt COMMA expression_list
     {
-      if ($3 != nullptr) {
-        $$ = $3;
+      if ($4 != nullptr) {
+        $$ = $4;
       } else {
         $$ = new vector<unique_ptr<Expression>>;
+      }
+      if ($2 != nullptr) {
+        $1->set_alias_name($2);
       }
       $$->emplace($$->begin(), $1);
     }
@@ -830,6 +838,18 @@ in_opt:
 like_opt:
     LIKE_T { $$ = LIKE; }
     | NOT LIKE_T { $$ = NOT_LIKE; }
+    ;
+
+alias_opt:
+    {
+      $$ = nullptr;
+    }
+    | ID {
+      $$ = $1;
+    }
+    | AS_T ID {
+      $$ = $2;
+    }
     ;
 
 group_by:

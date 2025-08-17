@@ -202,11 +202,16 @@ RC ExpressionBinder::bind_unbound_field_expression(
     Field      field(table, field_meta);
     FieldExpr *field_expr = new FieldExpr(field);
 
-    // 如果一个查询中涉及到2个或以上表，schema中需要给出表名
-    if (context_.query_tables().size() > 1) {
-      field_expr->set_name(unbound_field_expr->name());
-    } else {
-      field_expr->set_name(field_name);
+    if (!unbound_field_expr->alias_name().empty()) {
+      field_expr->set_name(unbound_field_expr->alias_name());
+    }
+    else {
+      // 如果一个查询中涉及到2个或以上表，schema中需要给出表名
+      if (context_.query_tables().size() > 1) {
+        field_expr->set_name(unbound_field_expr->name());
+      } else {
+        field_expr->set_name(field_name);
+      }
     }
     bound_expressions.emplace_back(field_expr);
   }
@@ -224,6 +229,9 @@ RC ExpressionBinder::bind_field_expression(
 RC ExpressionBinder::bind_value_expression(
     unique_ptr<Expression> &value_expr, vector<unique_ptr<Expression>> &bound_expressions)
 {
+  if (!value_expr->alias_name().empty()) {
+    value_expr->set_name(value_expr->alias_name());
+  }
   bound_expressions.emplace_back(std::move(value_expr));
   return RC::SUCCESS;
 }
@@ -409,6 +417,9 @@ RC ExpressionBinder::bind_arithmetic_expression(
     }
   }
 
+  if (!expr->alias_name().empty()) {
+    expr->set_name(expr->alias_name());
+  }
   bound_expressions.emplace_back(std::move(expr));
   return RC::SUCCESS;
 }
@@ -497,7 +508,12 @@ RC ExpressionBinder::bind_aggregate_expression(
   }
 
   auto aggregate_expr = make_unique<AggregateExpr>(aggregate_type, std::move(child_expr));
-  aggregate_expr->set_name(unbound_aggregate_expr->name());
+  if (!unbound_aggregate_expr->alias_name().empty()) {
+    aggregate_expr->set_name(unbound_aggregate_expr->alias_name());
+  }
+  else {
+    aggregate_expr->set_name(unbound_aggregate_expr->name());
+  }
   rc = check_aggregate_expression(*aggregate_expr);
   if (OB_FAIL(rc)) {
     return rc;
@@ -521,6 +537,9 @@ RC ExpressionBinder::bind_subquery_expression(
     }
   } else {
     ret = new SubQueryExpr{expr->values()};
+  }
+  if (!expr->alias_name().empty()) {
+    ret->set_name(expr->alias_name());
   }
   bound_expressions.emplace_back(ret);
   return rc;
