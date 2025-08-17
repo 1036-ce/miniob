@@ -31,3 +31,14 @@ create table exp_table2(id int, col1 int);
 insert into exp_table2 VALUES (1, 1);
 insert into exp_table2 VALUES (2, 3);
 -- sort select exp_table.id,3*exp_table2.col1/(exp_table.col2+2) from exp_table,exp_table2 where 3*exp_table2.col1/(exp_table.col2+2)>1;
+
+-- echo 3. aggregation expression corner case
+create table exp_table3(id int, col1 int, col2 int, col3 float, col4 float);
+insert into exp_table3 VALUES (7, 1, 1, 8.51, 7.14);
+insert into exp_table3 VALUES (3, 3, 8, 7.31, 5.68);
+insert into exp_table3 VALUES (2, 5, 2, 2.11, 7.87);
+select count(id) from exp_table where 4/1*5 < 2+col3*col3/7;
+select min(id) from exp_table where 4/1*5 < 2+col3*col3/7;
+select max(id) from exp_table where 4/1*5 < 2+col3*col3/7;
+select sum(id) from exp_table where 4/1*5 < 2+col3*col3/7;
+select avg(id) from exp_table where 4/1*5 < 2+col3*col3/7;
