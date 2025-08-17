@@ -9,14 +9,15 @@ RC SubQueryExpr::build_select_stmt(BinderContext& binder_context)
     return rc;
   }
 
-  BinderContext sub_binder_context;
-  sub_binder_context.set_db(binder_context.db());
-  for (auto table: binder_context.outer_query_tables()) {
-    sub_binder_context.add_outer_table(table);
-  }
-  for (auto table: binder_context.query_tables()) {
-    sub_binder_context.add_outer_table(table);
-  }
+  /* BinderContext sub_binder_context;
+   * sub_binder_context.set_db(binder_context.db());
+   * for (auto table: binder_context.outer_query_tables()) {
+   *   sub_binder_context.add_outer_table(table);
+   * }
+   * for (auto table: binder_context.query_tables()) {
+   *   sub_binder_context.add_outer_table(table);
+   * }  */
+  BinderContext sub_binder_context = binder_context.gen_sub_context();
 
   if (OB_FAIL(rc = SelectStmt::create(binder_context.db(), sql_node_->selection, stmt, sub_binder_context))) {
     return rc;

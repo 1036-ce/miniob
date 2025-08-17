@@ -22,12 +22,31 @@ public:
   BinderContext()          = default;
   virtual ~BinderContext() = default;
 
-  void add_table(Table *table) { query_tables_.push_back(table); }
-  void add_outer_table(Table *table) { outer_query_tables_.push_back(table); }
-  void add_used_outer_table(Table *table) { used_outer_tables_.push_back(table); }
+  void add_table(Table *table)
+  {
+    query_tables_.push_back(table);
+    table_map_.insert({table->name(), table});
+  }
+  void add_outer_table(Table *table)
+  {
+    outer_query_tables_.push_back(table);
+  }
+  void add_used_outer_table(Table *table)
+  {
+    used_outer_tables_.push_back(table);
+  }
 
-  void clear_table() { query_tables_.clear(); }
-  void clear_outer_table() { outer_query_tables_.clear(); }
+  void add_table(const string &alias_name, Table *table)
+  {
+    query_tables_.push_back(table);
+    table_map_.insert({alias_name, table});
+  }
+
+  void clear_table() { 
+    query_tables_.clear(); 
+    table_map_.clear();
+  }
+  void clear_outer_table() { outer_query_tables_.clear(); } 
 
   Table *find_table(const char *table_name) const;
   Table *find_outer_table(const char *table_name) const;
@@ -36,15 +55,43 @@ public:
   const vector<Table *> &outer_query_tables() const { return outer_query_tables_; }
   const vector<Table *> &used_outer_tables() const { return used_outer_tables_; }
 
-  void set_db(Db* db) { db_ = db;}
-  Db* db() { return db_; }
+  void set_db(Db *db) { db_ = db; }
+  Db  *db() { return db_; }
+
+  BinderContext gen_sub_context() const {
+    BinderContext sub_context;
+    sub_context.db_ = this->db_;
+    sub_context.table_map_ = this->table_map_;
+    sub_context.outer_query_tables_ = this->outer_query_tables_;
+    for (auto table: this->query_tables_) {
+      sub_context.outer_query_tables_.push_back(table);
+    }
+    sub_context.used_outer_tables_.clear();
+    return sub_context;
+  }
 
 private:
-  Db* db_ = nullptr;
+  Db             *db_ = nullptr;
   vector<Table *> query_tables_;
   vector<Table *> outer_query_tables_;
+  vector<Table *> used_outer_tables_;
 
-  vector<Table*> used_outer_tables_;
+  struct Hash {
+    std::size_t operator()(const string& s) const {
+      string t = s;
+      for (char &c : t) {
+        c = std::tolower(c);
+      }
+      return std::hash<string>{}(t);
+    }
+  };
+
+  struct EqualTo
+  {
+    bool operator()(const string &lhs, const string &rhs) const { return 0 == strcasecmp(lhs.c_str(), rhs.c_str()); }
+  };
+
+  unordered_map<string, Table *, Hash, EqualTo> table_map_;
 };
 
 /**
@@ -74,8 +121,7 @@ private:
       unique_ptr<Expression> &arithmetic_expr, vector<unique_ptr<Expression>> &bound_expressions);
   RC bind_aggregate_expression(
       unique_ptr<Expression> &aggregate_expr, vector<unique_ptr<Expression>> &bound_expressions);
-  RC bind_subquery_expression(
-      unique_ptr<Expression> &subquery_expr, vector<unique_ptr<Expression>> &bound_expressions);
+  RC bind_subquery_expression(unique_ptr<Expression> &subquery_expr, vector<unique_ptr<Expression>> &bound_expressions);
 
 private:
   BinderContext &context_;

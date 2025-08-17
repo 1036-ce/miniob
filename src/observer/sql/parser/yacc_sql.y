@@ -782,9 +782,12 @@ table_refs:
     ;
 
 table_factor:
-    relation {
+    relation alias_opt {
       UnboundSingleTable* tmp = new UnboundSingleTable();
       tmp->relation_name = $1;
+      if ($2 != nullptr) {
+        tmp->alias_name = $2;
+      }
       $$ = tmp;
     }
     ;

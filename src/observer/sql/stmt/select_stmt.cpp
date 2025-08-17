@@ -227,7 +227,16 @@ auto SelectStmt::collect_tables(
       LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
+
     table_map.insert({table_name, table});
+    if (!single_table->alias_name.empty()) {
+      const char* alias_name = single_table->alias_name.c_str();
+      if (table_map.contains(alias_name)) {
+        return RC::INVALID_ARGUMENT;
+      }
+      table_map.insert({alias_name, table});
+    }
+    
     binder_context.add_table(table);
     return RC::SUCCESS;
   }

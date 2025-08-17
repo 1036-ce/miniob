@@ -21,25 +21,53 @@ See the Mulan PSL v2 for more details. */
 
 using namespace common;
 
+/* Table *BinderContext::find_table(const char *table_name) const
+ * {
+ *   auto pred = [table_name](Table *table) { return 0 == strcasecmp(table_name, table->name()); };
+ *   auto iter = ranges::find_if(query_tables_, pred);
+ *   if (iter == query_tables_.end()) {
+ *     return nullptr;
+ *   }
+ *   return *iter;
+ * }
+ * 
+ * Table *BinderContext::find_outer_table(const char *table_name) const
+ * {
+ *   auto pred = [table_name](Table *table) { return 0 == strcasecmp(table_name, table->name()); };
+ *   auto iter = ranges::find_if(outer_query_tables_, pred);
+ *   if (iter == outer_query_tables_.end()) {
+ *     return nullptr;
+ *   }
+ *   return *iter;
+ * }   */
+
 Table *BinderContext::find_table(const char *table_name) const
 {
-  auto pred = [table_name](Table *table) { return 0 == strcasecmp(table_name, table->name()); };
-  auto iter = ranges::find_if(query_tables_, pred);
-  if (iter == query_tables_.end()) {
+  if (!table_map_.contains(table_name)) {
     return nullptr;
   }
-  return *iter;
+  Table* target = table_map_.at(table_name);
+  for (auto table: query_tables_) {
+    if (table == target) {
+      return table;
+    }
+  }
+  return nullptr;
 }
 
 Table *BinderContext::find_outer_table(const char *table_name) const
 {
-  auto pred = [table_name](Table *table) { return 0 == strcasecmp(table_name, table->name()); };
-  auto iter = ranges::find_if(outer_query_tables_, pred);
-  if (iter == outer_query_tables_.end()) {
+  if (!table_map_.contains(table_name)) {
     return nullptr;
   }
-  return *iter;
-}
+  Table* target = table_map_.at(table_name);
+  for (auto table: outer_query_tables_) {
+    if (table == target) {
+      return table;
+    }
+  }
+  return nullptr;
+}   
 
 ////////////////////////////////////////////////////////////////////////////////
 static void wildcard_fields(Table *table, vector<unique_ptr<Expression>> &expressions, int table_cnt)

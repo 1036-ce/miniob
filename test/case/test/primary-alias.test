@@ -18,4 +18,4 @@ select id * 2 + 3 ii, col1 c1, feat1 as f1 from t_alias_1;
 select min(id) as m_id from t_alias_1;
 select min(id) as m_id from t_alias_1 group by id;
 
-select * from table_alias_1 t1 where id in (select t2.id from table_alias_2 t2 where t2.col2 >= t1.col1);
+select * from t_alias_1 t1 where id in (select t2.id from t_alias_2 t2 where t2.col2 >= t1.col1);

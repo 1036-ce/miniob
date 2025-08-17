@@ -99,6 +99,7 @@ struct UnboundTable {
 
 struct UnboundSingleTable : public UnboundTable {
   string relation_name;
+  string alias_name;
 };
 
 struct UnboundJoinedTable : public UnboundTable {
