@@ -32,6 +32,8 @@ string comp2str(CompOp comp)
     case CompOp::IS_NOT: return "is not";
     case CompOp::IN: return "in";
     case CompOp::NOT_IN: return "not in";
+    case CompOp::LIKE: return "like";
+    case CompOp::NOT_LIKE: return "not like";
     default: return "";
   }
 }
@@ -170,6 +172,15 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
   }
   if (left.is_null() || right.is_null()) {
     result = false;
+    return rc;
+  }
+
+  if (comp_ == CompOp::LIKE) {
+    result = match(left.get_string(), right.get_string());
+    return rc;
+  }
+  if (comp_ == CompOp::NOT_LIKE) {
+    result = !match(left.get_string(), right.get_string());
     return rc;
   }
 
@@ -382,6 +393,40 @@ RC ComparisonExpr::comp_notin_handler(const Tuple &tuple, Value &value) const
   return rc;
 }
 
+bool ComparisonExpr::match(const string& target, const string& pattern) const {
+	size_t pos = 0;
+	while (pos < target.size() && pos < pattern.size()) {
+		if (pattern.at(pos) == '%') {
+			break;
+		}
+		if (pattern.at(pos) == '_') {
+			++pos;
+			continue;
+		}
+		if (target.at(pos) != pattern.at(pos)) {
+			return false;
+		}
+		++pos;
+	}
+
+	if (pos < pattern.size() && pattern.at(pos) == '%') {
+		string pattern_remainder = pattern.substr(pos + 1);
+		while (pos <= target.size()) {
+			string target_remainder = target.substr(pos);
+			if (match(target_remainder, pattern_remainder)) {
+				return true;
+			}
+			++pos;
+		}
+	}
+
+	if (pos == target.size() && pos == pattern.size()) {
+		return true;
+	}
+
+	return false;
+}
+
 RC ComparisonExpr::to_compareable()
 {
   RC rc = RC::SUCCESS;
@@ -393,6 +438,11 @@ RC ComparisonExpr::to_compareable()
     return rc;
   }
 
+  if (comp_ == CompOp::LIKE || comp_ == CompOp::NOT_LIKE) {
+    return rc;
+  }
+
+  // 如果比较的一侧为null，无需cast
   if (left_->type() == ExprType::VALUE) {
     Value val;
     if (OB_FAIL(rc = left_->try_get_value(val))) {

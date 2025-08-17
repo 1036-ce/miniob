@@ -55,6 +55,8 @@ enum CompOp
   IS_NOT,       ///< "is not"
   IN,           ///< "in"
   NOT_IN,       ///< "not in"
+  LIKE,         ///< "like"
+  NOT_LIKE,     ///< "not like"
   NO_OP
 };
 

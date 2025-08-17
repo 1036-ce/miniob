@@ -130,6 +130,7 @@ SubQueryExpr *create_subquery_expression(const vector<Value>& value_list) {
         IN_T
         ORDER_T
         TEXT_T
+        LIKE_T
         HAVING_T
         EQ
         LT
@@ -178,6 +179,7 @@ SubQueryExpr *create_subquery_expression(const vector<Value>& value_list) {
 %type <cstring>             relation
 %type <comp>                comp_op
 %type <comp>                in_opt
+%type <comp>                like_opt
 %type <rel_attr>            rel_attr
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
@@ -673,8 +675,10 @@ predicate:
     bit_expr {
       $$ = $1;
     }
-    // | bit_expr LIKE simple_expr {
-    // }
+    | bit_expr like_opt simple_expr {
+      $$ = new ComparisonExpr($2, $1, $3);
+      $$->set_name(token_name(sql_string, &@$));
+    }
     | bit_expr in_opt LBRACE value_list RBRACE {
       SubQueryExpr* subquery_expr = create_subquery_expression(*$4);
       $$ = new ComparisonExpr($2, $1, subquery_expr);
@@ -821,6 +825,11 @@ comp_op:
 in_opt:
     IN_T { $$ = IN; }
     | NOT IN_T { $$ = NOT_IN; }
+    ;
+
+like_opt:
+    LIKE_T { $$ = LIKE; }
+    | NOT LIKE_T { $$ = NOT_LIKE; }
     ;
 
 group_by:
