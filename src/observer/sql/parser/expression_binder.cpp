@@ -21,26 +21,6 @@ See the Mulan PSL v2 for more details. */
 
 using namespace common;
 
-/* Table *BinderContext::find_table(const char *table_name) const
- * {
- *   auto pred = [table_name](Table *table) { return 0 == strcasecmp(table_name, table->name()); };
- *   auto iter = ranges::find_if(query_tables_, pred);
- *   if (iter == query_tables_.end()) {
- *     return nullptr;
- *   }
- *   return *iter;
- * }
- * 
- * Table *BinderContext::find_outer_table(const char *table_name) const
- * {
- *   auto pred = [table_name](Table *table) { return 0 == strcasecmp(table_name, table->name()); };
- *   auto iter = ranges::find_if(outer_query_tables_, pred);
- *   if (iter == outer_query_tables_.end()) {
- *     return nullptr;
- *   }
- *   return *iter;
- * }   */
-
 Table *BinderContext::find_table(const char *table_name) const
 {
   if (!table_map_.contains(table_name)) {
@@ -213,8 +193,6 @@ RC ExpressionBinder::bind_unbound_field_expression(
         return RC::SCHEMA_TABLE_NOT_EXIST;
       }
       context_.add_used_outer_table(table);
-      /* LOG_INFO("no such table in from list: %s", table_name);
-       * return RC::SCHEMA_TABLE_NOT_EXIST; */
     }
   }
 
@@ -235,11 +213,12 @@ RC ExpressionBinder::bind_unbound_field_expression(
     }
     else {
       // 如果一个查询中涉及到2个或以上表，schema中需要给出表名
-      if (context_.current_query_tables().size() > 1) {
-        field_expr->set_name(unbound_field_expr->name());
-      } else {
-        field_expr->set_name(field_name);
-      }
+      field_expr->set_name(field_name);
+      /* if (context_.current_query_tables().size() > 1) {
+       *   field_expr->set_name(unbound_field_expr->name());
+       * } else {
+       *   field_expr->set_name(field_name);
+       * } */
     }
     bound_expressions.emplace_back(field_expr);
   }
