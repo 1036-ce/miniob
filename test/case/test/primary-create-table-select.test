@@ -23,3 +23,6 @@ select * from cts5;
 
 create table cts6 as select id*2, age*3-4, name, -score+5 from t_basic;
 select * from cts6;
+
+create table cts7(id int, age int) select id, age from t_basic;
+select * from cts7;

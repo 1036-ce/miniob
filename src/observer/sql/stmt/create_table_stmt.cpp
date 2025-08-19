@@ -18,18 +18,6 @@ See the Mulan PSL v2 for more details. */
 #include "event/sql_debug.h"
 
 
-CreateTableStmt::CreateTableStmt(SelectStmt* select_stmt, const string& table_name, const vector<string>& pks, StorageFormat storage_format) {
-  table_name_ = table_name;
-  primary_keys_ = pks;
-  select_stmt_ = select_stmt;
-  storage_format_ = storage_format;
-
-  for (const auto& expr: select_stmt->query_expressions()) {
-    AttrInfoSqlNode attr_info{expr->value_type(), expr->name(), static_cast<size_t>(expr->value_length()), true};
-    attr_infos_.push_back(attr_info);
-  }
-}
-
 RC CreateTableStmt::create(Db *db, const CreateTableSqlNode &create_table, Stmt *&stmt)
 {
   StorageFormat storage_format = get_storage_format(create_table.storage_format.c_str());
@@ -49,7 +37,13 @@ RC CreateTableStmt::create(Db *db, const CreateTableSqlNode &create_table, Stmt 
     LOG_WARN("create select stmt failed");
     return rc;
   }
-  stmt = new CreateTableStmt(static_cast<SelectStmt*>(select_stmt), create_table.relation_name, create_table.primary_keys, storage_format);
+  vector<AttrInfoSqlNode> attr_infos;
+  if (OB_FAIL(rc = get_attr_infos(static_cast<SelectStmt*>(select_stmt), create_table.attr_infos, attr_infos))) {
+    return rc;
+  }
+  stmt = new CreateTableStmt(create_table.relation_name, attr_infos, create_table.primary_keys, storage_format, static_cast<SelectStmt*>(select_stmt));
+
+  // stmt = new CreateTableStmt(static_cast<SelectStmt*>(select_stmt), create_table.relation_name, create_table.primary_keys, storage_format);
 
   return RC::SUCCESS;
 }
@@ -66,4 +60,28 @@ StorageFormat CreateTableStmt::get_storage_format(const char *format_str) {
     format = StorageFormat::UNKNOWN_FORMAT;
   }
   return format;
+}
+
+RC CreateTableStmt::get_attr_infos(SelectStmt* select_stmt, const vector<AttrInfoSqlNode>& attr_infos, vector<AttrInfoSqlNode>& result) {
+  if (!attr_infos.empty() && attr_infos.size() != select_stmt->query_expressions().size()) {
+    return RC::INVALID_ARGUMENT;
+  }
+  if (attr_infos.empty()) {
+    for (const auto& expr: select_stmt->query_expressions()) {
+      AttrInfoSqlNode attr_info{expr->value_type(), expr->name(), static_cast<size_t>(expr->value_length()), true};
+      result.push_back(attr_info);
+    }
+  }
+  else {
+    const auto& query_exprs = select_stmt->query_expressions();
+    for (size_t i = 0; i < query_exprs.size(); ++i) {
+      const auto& expr = query_exprs.at(i);
+      AttrInfoSqlNode attr_info = attr_infos.at(i);
+      if (attr_info.name != expr->name() || attr_info.type != expr->value_type()) {
+        return RC::INVALID_ARGUMENT;
+      }
+    }
+    result = attr_infos;
+  }
+  return RC::SUCCESS;
 }

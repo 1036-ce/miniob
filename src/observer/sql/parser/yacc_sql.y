@@ -209,6 +209,7 @@ SubQueryExpr *create_subquery_expression(const vector<Value>& value_list) {
 %type <order_by_entry>      order_by_entry
 %type <sql_node>            calc_stmt
 %type <sql_node>            select_stmt
+%type <sql_node>            select_stmt_opt
 %type <sql_node>            insert_stmt
 %type <sql_node>            update_stmt
 %type <sql_node>            delete_stmt
@@ -353,7 +354,7 @@ drop_index_stmt:      /*drop index 语句的语法解析树*/
     }
     ;
 create_table_stmt:    /*create table 语句的语法解析树*/
-    CREATE TABLE ID LBRACE attr_def attr_def_list primary_key RBRACE storage_format
+    CREATE TABLE ID LBRACE attr_def attr_def_list primary_key RBRACE select_stmt_opt storage_format
     {
       $$ = new ParsedSqlNode(SCF_CREATE_TABLE);
       CreateTableSqlNode &create_table = $$->create_table;
@@ -373,17 +374,27 @@ create_table_stmt:    /*create table 语句的语法解析树*/
         delete $7;
       }
       if ($9 != nullptr) {
-        create_table.storage_format = $9;
+        create_table.select_sql_node = &($9->selection);
       }
-      create_table.select_sql_node = nullptr;
+      else {
+        create_table.select_sql_node = nullptr;
+      }
+      if ($10 != nullptr) {
+        create_table.storage_format = $10;
+      }
     }
-    | CREATE TABLE ID AS_T select_stmt storage_format {
+    | CREATE TABLE ID select_stmt_opt storage_format {
       $$ = new ParsedSqlNode(SCF_CREATE_TABLE);
       CreateTableSqlNode &create_table = $$->create_table;
       create_table.relation_name = $3;
-      create_table.select_sql_node = &($5->selection);
-      if ($6 != nullptr) {
-        create_table.storage_format = $6;
+      if ($4 != nullptr) {
+        create_table.select_sql_node = &($4->selection);
+      }
+      else {
+        create_table.select_sql_node = nullptr;
+      }
+      if ($5 != nullptr) {
+        create_table.storage_format = $5;
       }
     }
     ;
@@ -634,6 +645,19 @@ select_stmt:        /*  select 语句的语法解析树*/
       }
     }
     ;
+
+select_stmt_opt:
+    {
+      $$ = nullptr;
+    }
+    | select_stmt {
+      $$ = $1;
+    }
+    | AS_T select_stmt {
+      $$ = $2;
+    }
+    ;
+
 calc_stmt:
     CALC expression_list
     {
