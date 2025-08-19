@@ -147,7 +147,7 @@ ID | NUM | PRICE | BIRTHDAY
 
 SELECT null_table.num,null_table2.num,null_table.birthday FROM null_table,null_table2 where null_table.num=null_table2.num;
 18 | 18 | 2020-01-01
-NULL_TABLE.NUM | NULL_TABLE2.NUM | NULL_TABLE.BIRTHDAY
+NUM | NUM | BIRTHDAY
 
 5. AGGREGATION
 SELECT count(*) FROM null_table;

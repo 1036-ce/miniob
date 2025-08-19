@@ -358,7 +358,6 @@ create_table_stmt:    /*create table 语句的语法解析树*/
       $$ = new ParsedSqlNode(SCF_CREATE_TABLE);
       CreateTableSqlNode &create_table = $$->create_table;
       create_table.relation_name = $3;
-      //free($3);
 
       vector<AttrInfoSqlNode> *src_attrs = $6;
 
@@ -375,6 +374,16 @@ create_table_stmt:    /*create table 语句的语法解析树*/
       }
       if ($9 != nullptr) {
         create_table.storage_format = $9;
+      }
+      create_table.select_sql_node = nullptr;
+    }
+    | CREATE TABLE ID AS_T select_stmt storage_format {
+      $$ = new ParsedSqlNode(SCF_CREATE_TABLE);
+      CreateTableSqlNode &create_table = $$->create_table;
+      create_table.relation_name = $3;
+      create_table.select_sql_node = &($5->selection);
+      if ($6 != nullptr) {
+        create_table.storage_format = $6;
       }
     }
     ;

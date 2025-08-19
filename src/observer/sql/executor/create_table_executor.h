@@ -15,6 +15,9 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include "common/sys/rc.h"
+#include "session/session.h"
+#include "sql/operator/physical_operator.h"
+#include "sql/stmt/select_stmt.h"
 
 class SQLStageEvent;
 
@@ -29,4 +32,6 @@ public:
   virtual ~CreateTableExecutor() = default;
 
   RC execute(SQLStageEvent *sql_event);
+private:
+  RC gen_select_physical_plan(SelectStmt* select_stmt, unique_ptr<PhysicalOperator>& physical_oper, Session *session);
 };

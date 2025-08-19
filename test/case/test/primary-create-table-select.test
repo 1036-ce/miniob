@@ -1,0 +1,25 @@
+create table t_basic(id int, age int, name char, score float);
+insert into t_basic values(1,1, 'a', 1.0);
+insert into t_basic values(2,2, 'b', 2.0);
+insert into t_basic values(4,4, 'c', 3.0);
+insert into t_basic values(3,3, 'd', 4.0);
+insert into t_basic values(5,5, 'e', 5.5);
+insert into t_basic values(6,6, 'f', 6.6);
+insert into t_basic values(7,7, 'g', 7.7);
+
+create table cts as select * from t_basic;
+select * from cts;
+create table cts1 as select count(id) from t_basic;
+select * from cts1;
+create table cts1 as select count(id) from t_basic group by id;
+create table cts2 as select count(id) from t_basic group by id;
+select * from cts2;
+create table cts3 as select min(id) from t_basic;
+select * from cts3;
+create table cts4 as select max(id) from t_basic;
+select * from cts4;
+create table cts5 as select avg(id) from t_basic;
+select * from cts5;
+
+create table cts6 as select id*2, age*3-4, name, -score+5 from t_basic;
+select * from cts6;

@@ -304,6 +304,7 @@ public:
   RC try_get_value(Value &value) const override;
 
   AttrType value_type() const override { return cast_type_; }
+  int      value_length() const override { return child_->value_length(); }
 
   unique_ptr<Expression> &child() { return child_; }
 
@@ -600,7 +601,12 @@ public:
   ExprType type() const override { return ExprType::AGGREGATION; }
 
   AttrType value_type() const override { return child_->value_type(); }
-  int      value_length() const override { return child_->value_length(); }
+  int      value_length() const override { 
+    if (aggregate_type_ == AggregateExpr::Type::COUNT) {
+      return 4;
+    }
+    return child_->value_length(); 
+  }
 
   RC get_value(const Tuple &tuple, Value &value) const override;
 

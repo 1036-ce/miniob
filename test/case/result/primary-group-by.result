@@ -78,4 +78,4 @@ select t_group_by.id, t_group_by.name, avg(t_group_by.score), avg(t_group_by_2.a
 3 | D | 3 | 23.33
 3 | F | 2 | 23.33
 4 | C | 3 | 20
-T_GROUP_BY.ID | T_GROUP_BY.NAME | AVG(T_GROUP_BY.SCORE) | AVG(T_GROUP_BY_2.AGE)
+ID | NAME | AVG(T_GROUP_BY.SCORE) | AVG(T_GROUP_BY_2.AGE)
