@@ -44,7 +44,7 @@ public:
     /* current_query_tables_.push_back(table);
      * table_map_.insert({alias_name, table});
      * unique_tables_.insert(table); */
-    table_map_.insert({table->name(), table});
+    table_map_.insert({alias_name, table});
     if (!unique_tables_.contains(table)) {
       current_query_tables_.push_back(table);
       unique_tables_.insert(table);
