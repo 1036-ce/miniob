@@ -249,6 +249,10 @@ RC Table::create_index(Trx *trx, const vector<FieldMeta>& field_metas, const cha
   return engine_->create_index(trx, field_metas, index_name);
 }
 
+RC Table::create_index(Trx *trx, const vector<FieldMeta>& field_metas, const char *index_name, bool is_unique) {
+  return engine_->create_index(trx, field_metas, index_name, is_unique);
+}
+
 RC Table::delete_record(const Record &record) { return engine_->delete_record(record); }
 
 Index *Table::find_index(const char *index_name) const { return engine_->find_index(index_name); }

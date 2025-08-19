@@ -149,11 +149,16 @@ class KeyComparator
 {
 public:
   KeyComparator() = default;
+  // used in BplusTreeScanner
   KeyComparator(const IndexKeyFieldMeta *attr_infos, int32_t attr_cnt, int32_t comp_cnt = -1) {
     attr_comparator_.init(attr_infos, attr_cnt, comp_cnt);
+    is_unique_ = false;
   }
 
-  void init(const IndexKeyFieldMeta *attr_infos, int32_t attr_cnt) { attr_comparator_.init(attr_infos, attr_cnt, -1); }
+  void init(const IndexKeyFieldMeta *attr_infos, int32_t attr_cnt, bool is_unique) { 
+    attr_comparator_.init(attr_infos, attr_cnt, -1); 
+    is_unique_ = is_unique;
+  }
 
   const AttrComparator &attr_comparator() const { return attr_comparator_; }
 
@@ -164,10 +169,13 @@ public:
   int operator()(const char *v1, const char *v2) const
   {
     int result = attr_comparator_(v1, v2);
-    if (result != 0) {
+    if (is_unique_) {
       return result;
     }
 
+    if (result != 0) {
+      return result;
+    }
     const RID *rid1 = (const RID *)(v1 + attr_comparator_.length());
     const RID *rid2 = (const RID *)(v2 + attr_comparator_.length());
     return RID::compare(rid1, rid2);
@@ -175,6 +183,7 @@ public:
 
 private:
   AttrComparator attr_comparator_;
+  bool is_unique_ = false;
 };
 
 /**
@@ -264,6 +273,7 @@ struct IndexFileHeader
   // AttrType attr_type;          ///< 键值的类型
   IndexKeyFieldMeta attr_infos[INDEX_MAX_COLUMN_COUNT];
   int32_t         attr_cnt;
+  bool            is_unique;
 
   const string to_string() const
   {
@@ -566,8 +576,8 @@ public:
    * attr_length, int internal_max_size = -1, int leaf_max_size = -1); RC create(LogHandler &log_handler, DiskBufferPool
    * &buffer_pool, AttrType attr_type, int attr_length, int internal_max_size = -1, int leaf_max_size = -1); */
   RC create(LogHandler &log_handler, BufferPoolManager &bpm, const char *file_name,
-      const vector<FieldMeta> &field_metas, int internal_max_size = -1, int leaf_max_size = -1);
-  RC create(LogHandler &log_handler, DiskBufferPool &buffer_pool, const vector<FieldMeta> &field_metas,
+      const vector<FieldMeta> &field_metas, bool is_unique, int internal_max_size = -1, int leaf_max_size = -1);
+  RC create(LogHandler &log_handler, DiskBufferPool &buffer_pool, const vector<FieldMeta> &field_metas, bool is_unique,
       int internal_max_size = -1, int leaf_max_size = -1);
 
   /**

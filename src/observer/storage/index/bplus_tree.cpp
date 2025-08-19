@@ -827,42 +827,8 @@ RC BplusTreeHandler::sync()
   return disk_buffer_pool_->flush_all_pages();
 }
 
-/* RC BplusTreeHandler::create(LogHandler &log_handler,
- *                             BufferPoolManager &bpm,
- *                             const char *file_name,
- *                             AttrType attr_type,
- *                             int attr_length,
- *                             int internal_max_size [> = -1<],
- *                             int leaf_max_size [> = -1 <])
- * {
- *   RC rc = bpm.create_file(file_name);
- *   if (OB_FAIL(rc)) {
- *     LOG_WARN("Failed to create file. file name=%s, rc=%d:%s", file_name, rc, strrc(rc));
- *     return rc;
- *   }
- *   LOG_INFO("Successfully create index file:%s", file_name);
- *
- *   DiskBufferPool *bp = nullptr;
- *
- *   rc = bpm.open_file(log_handler, file_name, bp);
- *   if (OB_FAIL(rc)) {
- *     LOG_WARN("Failed to open file. file name=%s, rc=%d:%s", file_name, rc, strrc(rc));
- *     return rc;
- *   }
- *   LOG_INFO("Successfully open index file %s.", file_name);
- *
- *   rc = this->create(log_handler, *bp, attr_type, attr_length, internal_max_size, leaf_max_size);
- *   if (OB_FAIL(rc)) {
- *     bpm.close_file(file_name);
- *     return rc;
- *   }
- *
- *   LOG_INFO("Successfully create index file %s.", file_name);
- *   return rc;
- * } */
-
 RC BplusTreeHandler::create(LogHandler &log_handler, BufferPoolManager &bpm, const char *file_name,
-    const vector<FieldMeta> &field_metas, int internal_max_size, int leaf_max_size)
+    const vector<FieldMeta> &field_metas, bool is_unique, int internal_max_size, int leaf_max_size)
 {
 
   RC rc = bpm.create_file(file_name);
@@ -881,7 +847,7 @@ RC BplusTreeHandler::create(LogHandler &log_handler, BufferPoolManager &bpm, con
   }
   LOG_INFO("Successfully open index file %s.", file_name);
 
-  rc = this->create(log_handler, *bp, field_metas, internal_max_size, leaf_max_size);
+  rc = this->create(log_handler, *bp, field_metas, is_unique, internal_max_size, leaf_max_size);
   if (OB_FAIL(rc)) {
     bpm.close_file(file_name);
     return rc;
@@ -891,80 +857,7 @@ RC BplusTreeHandler::create(LogHandler &log_handler, BufferPoolManager &bpm, con
   return rc;
 }
 
-/* RC BplusTreeHandler::create(LogHandler &log_handler, DiskBufferPool &buffer_pool, AttrType attr_type, int
- * attr_length, int internal_max_size , int leaf_max_size )
- * {
- *   if (internal_max_size < 0) {
- *     internal_max_size = calc_internal_page_capacity(attr_length);
- *   }
- *   if (leaf_max_size < 0) {
- *     leaf_max_size = calc_leaf_page_capacity(attr_length);
- *   }
- *
- *   log_handler_      = &log_handler;
- *   disk_buffer_pool_ = &buffer_pool;
- *
- *   RC rc = RC::SUCCESS;
- *
- *   BplusTreeMiniTransaction mtr(*this, &rc);
- *
- *   Frame *header_frame = nullptr;
- *
- *   rc = mtr.latch_memo().allocate_page(header_frame);
- *   if (OB_FAIL(rc)) {
- *     LOG_WARN("failed to allocate header page for bplus tree. rc=%d:%s", rc, strrc(rc));
- *     return rc;
- *   }
- *
- *   if (header_frame->page_num() != FIRST_INDEX_PAGE) {
- *     LOG_WARN("header page num should be %d but got %d. is it a new file",
- *              FIRST_INDEX_PAGE, header_frame->page_num());
- *     return RC::INTERNAL;
- *   }
- *
- *   char            *pdata         = header_frame->data();
- *   IndexFileHeader *file_header   = (IndexFileHeader *)pdata;
- *   file_header->attr_length       = attr_length;
- *   file_header->key_length        = attr_length + sizeof(RID);
- *   file_header->attr_type         = attr_type;
- *   file_header->internal_max_size = internal_max_size;
- *   file_header->leaf_max_size     = leaf_max_size;
- *   file_header->root_page         = BP_INVALID_PAGE_NUM;
- *
- *   // 取消记录日志的原因请参考下面的sync调用的地方。
- *   // mtr.logger().init_header_page(header_frame, *file_header);
- *
- *   header_frame->mark_dirty();
- *
- *   memcpy(&file_header_, pdata, sizeof(file_header_));
- *   header_dirty_ = false;
- *
- *   mem_pool_item_ = make_unique<common::MemPoolItem>("b+tree");
- *   if (mem_pool_item_->init(file_header->key_length) < 0) {
- *     LOG_WARN("Failed to init memory pool for index");
- *     close();
- *     return RC::NOMEM;
- *   }
- *
- *   key_comparator_.init(file_header->attr_type, file_header->attr_length);
- *   key_printer_.init(file_header->attr_type, file_header->attr_length);
- *
- *
- *   虽然我们针对B+树记录了WAL，但是我们记录的都是逻辑日志，并没有记录某个页面如何修改的物理日志。
- *   在做恢复时，必须先创建出来一个tree handler对象。但是如果元数据页面不正确的话，我们无法创建一个正确的tree
- * handler对象。 因此这里取消第一次元数据页面修改的WAL记录，而改用更简单的方式，直接将元数据页面刷到磁盘。
- *
- *   rc = this->sync();
- *   if (OB_FAIL(rc)) {
- *     LOG_WARN("failed to sync index header. rc=%d:%s", rc, strrc(rc));
- *     return rc;
- *   }
- *
- *   LOG_INFO("Successfully create index");
- *   return RC::SUCCESS;
- * } */
-
-RC BplusTreeHandler::create(LogHandler &log_handler, DiskBufferPool &buffer_pool, const vector<FieldMeta> &field_metas,
+RC BplusTreeHandler::create(LogHandler &log_handler, DiskBufferPool &buffer_pool, const vector<FieldMeta> &field_metas, bool is_unique,
     int internal_max_size, int leaf_max_size)
 {
   log_handler_      = &log_handler;
@@ -993,6 +886,7 @@ RC BplusTreeHandler::create(LogHandler &log_handler, DiskBufferPool &buffer_pool
   file_header->root_page       = BP_INVALID_PAGE_NUM;
   file_header->attr_cnt        = field_metas.size();
   file_header->key_length      = INDEX_NULL_BITMAP_LENGTH;
+  file_header->is_unique       = is_unique;
   for (int32_t i = 0; i < file_header->attr_cnt; ++i) {
     file_header->attr_infos[i].attr_type_   = field_metas.at(i).type();
     file_header->attr_infos[i].attr_offset_ = file_header_.key_length;
@@ -1024,7 +918,7 @@ RC BplusTreeHandler::create(LogHandler &log_handler, DiskBufferPool &buffer_pool
     return RC::NOMEM;
   }
 
-  key_comparator_.init(file_header_.attr_infos, file_header->attr_cnt);
+  key_comparator_.init(file_header_.attr_infos, file_header->attr_cnt, file_header->is_unique);
   key_printer_.init(file_header_.attr_infos, file_header->attr_cnt);
   /* key_comparator_.init(file_header->attr_type, file_header->attr_length);
    * key_printer_.init(file_header->attr_type, file_header->attr_length); */
@@ -1098,7 +992,7 @@ RC BplusTreeHandler::open(LogHandler &log_handler, DiskBufferPool &buffer_pool)
   // close old page_handle
   buffer_pool.unpin_page(frame);
 
-  key_comparator_.init(file_header_.attr_infos, file_header_.attr_cnt);
+  key_comparator_.init(file_header_.attr_infos, file_header_.attr_cnt, file_header_.is_unique);
   key_printer_.init(file_header_.attr_infos, file_header_.attr_cnt);
   /* key_comparator_.init(file_header_.attr_type, file_header_.attr_length);
    * key_printer_.init(file_header_.attr_type, file_header_.attr_length); */
@@ -1589,7 +1483,7 @@ RC BplusTreeHandler::recover_init_header_page(
   header_dirty_ = false;
   frame->mark_dirty();
 
-  key_comparator_.init(file_header_.attr_infos, file_header_.attr_cnt);
+  key_comparator_.init(file_header_.attr_infos, file_header_.attr_cnt, file_header_.is_unique);
   key_printer_.init(file_header_.attr_infos, file_header_.attr_cnt);
   /* key_comparator_.init(file_header_.attr_type, file_header_.attr_length);
    * key_printer_.init(file_header_.attr_type, file_header_.attr_length); */
@@ -2235,7 +2129,7 @@ RC BplusTreeScanner::open(vector<Value> left_values, bool left_inclusive, vector
   const IndexKeyFieldMeta* attr_infos = file_header.attr_infos;
 
   KeyComparator left_comp{file_header.attr_infos, file_header.attr_cnt, static_cast<int32_t>(left_values.size())};
-  KeyComparator right_comp{file_header.attr_infos, file_header.attr_cnt, static_cast<int32_t>(right_values.size())};
+  KeyComparator right_comp{file_header.attr_infos, file_header.attr_cnt, static_cast<int32_t>(right_values.size())}; 
 
   int left_cnt = left_values.size();
   int right_cnt = right_values.size();

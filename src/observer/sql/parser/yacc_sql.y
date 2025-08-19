@@ -133,6 +133,7 @@ SubQueryExpr *create_subquery_expression(const vector<Value>& value_list) {
         LIKE_T
         AS_T
         HAVING_T
+        UNIQUE_T
         EQ
         LT
         GT
@@ -182,6 +183,7 @@ SubQueryExpr *create_subquery_expression(const vector<Value>& value_list) {
 %type <comp>                in_opt
 %type <comp>                like_opt
 %type <cstring>             alias_opt
+%type <boolean>             unique_opt 
 %type <rel_attr>            rel_attr
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
@@ -329,16 +331,16 @@ desc_table_stmt:
     ;
 
 create_index_stmt:    /*create index 语句的语法解析树*/
-    // CREATE INDEX ID ON ID LBRACE ID RBRACE
-    CREATE INDEX ID ON ID LBRACE attr_list RBRACE
+    CREATE unique_opt INDEX ID ON ID LBRACE attr_list RBRACE
     {
       $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
       CreateIndexSqlNode &create_index = $$->create_index;
-      create_index.index_name = $3;
-      create_index.relation_name = $5;
+      create_index.is_unique = $2;
+      create_index.index_name = $4;
+      create_index.relation_name = $6;
       // create_index.attribute_name = $7;
-      create_index.attr_names.swap(*$7);
-      delete $7;
+      create_index.attr_names.swap(*$8);
+      delete $8;
     }
     ;
 
@@ -860,7 +862,14 @@ alias_opt:
       $$ = $2;
     }
     ;
-
+unique_opt:
+    {
+      $$ = false;
+    }
+    | UNIQUE_T {
+      $$ = true;
+    }
+    ;
 group_by:
     /* empty */
     {

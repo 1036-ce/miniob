@@ -253,6 +253,7 @@ struct CreateIndexSqlNode
   string relation_name;   ///< Relation name
   // string attribute_name;  ///< Attribute name
   vector<string> attr_names;
+  bool is_unique;
 };
 
 /**

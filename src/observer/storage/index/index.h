@@ -48,11 +48,11 @@ public:
    * {
    *   return RC::UNSUPPORTED;
    * } */
-  virtual RC create(Table *table, const char *file_name, const IndexMeta &index_meta, const vector<FieldMeta> &field_metas)
+  virtual RC create(Table *table, const char *file_name, const IndexMeta &index_meta, const vector<FieldMeta> &field_metas, bool is_unique)
   {
     return RC::UNSUPPORTED;
   }
-  virtual RC open(Table *table, const char *file_name, const IndexMeta &index_meta, const vector<FieldMeta> &field_metas)
+  virtual RC open(Table *table, const char *file_name, const IndexMeta &index_meta, const vector<FieldMeta> &field_metas, bool is_unique)
   {
     return RC::UNSUPPORTED;
   } 
@@ -108,12 +108,13 @@ public:
   virtual RC sync() = 0;
 
 protected:
-  RC init(const IndexMeta &index_meta, const vector<FieldMeta> &field_metas);
+  RC init(const IndexMeta &index_meta, const vector<FieldMeta> &field_metas, bool is_unique);
 
 protected:
   IndexMeta index_meta_;  ///< 索引的元数据
   // FieldMeta field_meta_;  ///< 当前实现仅考虑一个字段的索引
   vector<FieldMeta> field_metas_;
+  bool is_unique_;
 };
 
 /**

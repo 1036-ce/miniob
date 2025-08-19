@@ -28,10 +28,8 @@ public:
   BplusTreeIndex() = default;
   ~BplusTreeIndex() noexcept override;
 
-  /* RC create(Table *table, const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta) override;
-   * RC open(Table *table, const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta) override; */
-  RC create(Table *table, const char *file_name, const IndexMeta &index_meta, const vector<FieldMeta> &field_metas) override;
-  RC open(Table *table, const char *file_name, const IndexMeta &index_meta, const vector<FieldMeta> &field_metas) override; 
+  RC create(Table *table, const char *file_name, const IndexMeta &index_meta, const vector<FieldMeta> &field_metas, bool is_unique) override;
+  RC open(Table *table, const char *file_name, const IndexMeta &index_meta, const vector<FieldMeta> &field_metas, bool is_unique) override; 
   RC close();
 
   RC insert_entry(const char *record, const RID *rid) override;

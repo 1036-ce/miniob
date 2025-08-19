@@ -14,9 +14,10 @@ See the Mulan PSL v2 for more details. */
 
 #include "storage/index/index.h"
 
-RC Index::init(const IndexMeta &index_meta, const vector<FieldMeta> &field_metas)
+RC Index::init(const IndexMeta &index_meta, const vector<FieldMeta> &field_metas, bool is_unique)
 {
   index_meta_ = index_meta;
   field_metas_ = field_metas;
+  is_unique_ = is_unique;
   return RC::SUCCESS;
 }

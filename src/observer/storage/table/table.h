@@ -93,6 +93,7 @@ public:
   // TODO refactor
   RC create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name);
   RC create_index(Trx *trx, const vector<FieldMeta>& field_metas, const char *index_name);
+  RC create_index(Trx *trx, const vector<FieldMeta>& field_metas, const char *index_name, bool is_unique);
 
   RC get_record_scanner(RecordScanner *&scanner, Trx *trx, ReadWriteMode mode);
 
