@@ -35,8 +35,8 @@ RC FilterStmt::create(Db *db, Table *default_table, unordered_map<string, Table 
   RC            rc = RC::SUCCESS;
   BinderContext binder_context;
   binder_context.set_db(db);
-  for (const auto &[_, table] : *tables) {
-    binder_context.add_current_table(table);
+  for (const auto &[name, table] : *tables) {
+    binder_context.add_current_table(name, table);
   }
   vector<unique_ptr<Expression>> bound_expressions;
   ExpressionBinder               expression_binder(binder_context);
