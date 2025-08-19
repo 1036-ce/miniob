@@ -139,20 +139,45 @@ RC HeapTableEngine::insert_record(Record &record)
     return rc;
   }
 
-  rc = insert_entry_of_indexes(record);
-  if (rc != RC::SUCCESS) {  // 可能出现了键值重复
-    RC rc2 = delete_entry_of_indexes(record, false /*error_on_not_exists*/);
-    if (rc2 != RC::SUCCESS) {
-      LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
-                table_meta_->name(), rc2, strrc(rc2));
+  vector<Index*> inserted_indexes;
+  for (Index* index: indexes_) {
+    if (OB_FAIL(rc = index->insert_entry(record))) {
+      break;
     }
-    rc2 = record_handler_->delete_record(&record.rid());
-    if (rc2 != RC::SUCCESS) {
-      LOG_PANIC("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
-                table_meta_->name(), rc2, strrc(rc2));
+    inserted_indexes.push_back(index);
+  }
+  if (OB_SUCC(rc)) {
+    return rc;
+  }
+  RC ret_rc = rc;
+
+  // if insert failed, rollback it
+  for (Index* index: inserted_indexes) {
+    if (OB_FAIL(rc = index->delete_entry(record))) {
+      LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
+                table_meta_->name(), rc, strrc(rc));
+      return rc;
     }
   }
-  return rc;
+  if (OB_FAIL(rc = record_handler_->delete_record(&record.rid()))) {
+    LOG_PANIC("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
+        table_meta_->name(), rc, strrc(rc));
+  }
+
+  /* rc = insert_entry_of_indexes(record);
+   * if (rc != RC::SUCCESS) {  // 可能出现了键值重复
+   *   RC rc2 = delete_entry_of_indexes(record, false [>error_on_not_exists<]);
+   *   if (rc2 != RC::SUCCESS) {
+   *     LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
+   *               table_meta_->name(), rc2, strrc(rc2));
+   *   }
+   *   rc2 = record_handler_->delete_record(&record.rid());
+   *   if (rc2 != RC::SUCCESS) {
+   *     LOG_PANIC("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
+   *               table_meta_->name(), rc2, strrc(rc2));
+   *   }
+   * }  */
+  return ret_rc;
 }
 
 RC HeapTableEngine::visit_record(const RID &rid, function<bool(Record &)> visitor)

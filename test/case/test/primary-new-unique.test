@@ -1,0 +1,12 @@
+CREATE TABLE unique_table1(id int, col1 int, col2 int);
+CREATE TABLE unique_table2(id1 int, id2 int, col1 int, col2 int);
+INSERT INTO unique_table1 VALUES (1,1,1);
+INSERT INTO unique_table2 VALUES (1,1,1,1);
+
+CREATE UNIQUE INDEX index_id on unique_table2(id1,id2);
+INSERT INTO unique_table2 VALUES (2,2,1,1);
+INSERT INTO unique_table2 VALUES (1,1,1,1);
+CREATE UNIQUE INDEX index_id on unique_table2(id);
+INSERT INTO unique_table2 VALUES (2,3,1,1);
+
+select * from unique_table2;

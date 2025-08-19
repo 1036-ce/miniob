@@ -889,7 +889,7 @@ RC BplusTreeHandler::create(LogHandler &log_handler, DiskBufferPool &buffer_pool
   file_header->is_unique       = is_unique;
   for (int32_t i = 0; i < file_header->attr_cnt; ++i) {
     file_header->attr_infos[i].attr_type_   = field_metas.at(i).type();
-    file_header->attr_infos[i].attr_offset_ = file_header_.key_length;
+    file_header->attr_infos[i].attr_offset_ = file_header->key_length;
     file_header->attr_infos[i].attr_len_    = field_metas.at(i).len();
     file_header->key_length += field_metas.at(i).len();
   }
