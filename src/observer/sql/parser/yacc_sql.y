@@ -635,6 +635,9 @@ calc_stmt:
 expression_list:
     expression alias_opt
     {
+      if ($1->type() == ExprType::STAR && $2 != nullptr) {
+        YYERROR;
+      }
       if ($2 != nullptr) {
         $1->set_alias_name($2);
       }
