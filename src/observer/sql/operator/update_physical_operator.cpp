@@ -70,12 +70,10 @@ RC UpdatePhysicalOperator::open(Trx *trx)
       LOG_WARN("failed to make record. rc=%s", strrc(rc));
       return rc;
     }
-    Record old_record;
-    old_record.copy_data(row_tuple->record().data(), row_tuple->record().len());
-    old_record.set_rid(row_tuple->record().rid());
+    new_record.set_rid(row_tuple->record().rid());
 
-    old_records.push_back(std::move(old_record));
-    new_records.push_back(std::move(new_record));
+    old_records.push_back(std::move(row_tuple->record()));
+    new_records.push_back(std::move(new_record)); 
   }
 
   if (OB_FAIL(rc) && rc != RC::RECORD_EOF) {
@@ -86,17 +84,24 @@ RC UpdatePhysicalOperator::open(Trx *trx)
     return rc;
   }
 
-  for (Record &record : old_records) {
-    if (rc = trx->delete_record(table_, record); OB_FAIL(rc)) {
+  for (size_t i = 0; i < old_records.size(); ++i) {
+    // if (OB_FAIL(rc = trx->update_record(table_, old_records.at(i), new_records.at(i)))) {
+    if (OB_FAIL(rc = table_->update_record_with_trx(old_records.at(i), new_records.at(i), trx))) {
       return rc;
     }
   }
 
-  for (Record &record : new_records) {
-    if (rc = trx->insert_record(table_, record); OB_FAIL(rc)) {
-      return rc;
-    }
-  }
+/*   for (Record &record : old_records) {
+ *     if (rc = trx->delete_record(table_, record); OB_FAIL(rc)) {
+ *       return rc;
+ *     }
+ *   }
+ * 
+ *   for (Record &record : new_records) {
+ *     if (rc = trx->insert_record(table_, record); OB_FAIL(rc)) {
+ *       return rc;
+ *     }
+ *   } */
 
   return RC::SUCCESS;
 }
