@@ -239,6 +239,21 @@ RC PhysicalPlanGenerator::create_plan(
     return rc;
   }
 
+  // for subquery in target_expressions
+  for (auto& expr: update_oper.target_expressions()) {
+    if (expr->type() != ExprType::SUBQUERY) {
+      continue;
+    }
+    auto subquery = static_cast<SubQueryExpr *>(expr.get());
+    if (subquery->logical_oper()) {
+      unique_ptr<PhysicalOperator> physical_oper;
+      if (OB_FAIL(rc = create(*subquery->logical_oper(), physical_oper, session))) {
+        return rc;
+      }
+      subquery->set_physical_oper(std::move(physical_oper));
+    }
+  }
+
   oper = unique_ptr<PhysicalOperator>(
       new UpdatePhysicalOperator(update_oper.table(), std::move(update_oper.target_expressions())));
   oper->add_child(std::move(child_phy_oper));

@@ -1,0 +1,15 @@
+CREATE TABLE ust1(id int, t_name char(10), col1 int, col2 int);
+CREATE TABLE ust2(id int, t_name char(10), col1 int, col2 int);
+insert into ust1 VALUES (2, 'TW', 8, 3);
+insert into ust1 VALUES (2, '8M', 5, 4);
+insert into ust1 VALUES (7, '10NFRSZF27', 8, 2);
+insert into ust2 VALUES (2, 'TW', 8, 3);
+insert into ust2 VALUES (2, '8M', 5, 4);
+insert into ust2 VALUES (7, '10NFRSZF27', 8, 2);
+
+UPDATE ust1 SET t_name='JFWK', col2=8 WHERE id=2;
+SELECT * FROM ust1;
+UPDATE ust1 SET col1=2, col2=(select ust2.col2 from ust2 where ust2.id=1) WHERE id=2;
+SELECT * FROM ust1;
+UPDATE ust1 SET col1=2, col2=(select ust2.col2 from ust2 where ust2.col2=ust1.col2) WHERE id=2;
+SELECT * FROM ust1;

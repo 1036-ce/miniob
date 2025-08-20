@@ -31,6 +31,7 @@ public:
   UpdateStmt(Table *table, vector<unique_ptr<Expression>> &&target_expressions)
       : table_(table), target_expressions_(std::move(target_expressions))
   {}
+  ~UpdateStmt() override;
 
   StmtType type() const override { return StmtType::UPDATE; }
 

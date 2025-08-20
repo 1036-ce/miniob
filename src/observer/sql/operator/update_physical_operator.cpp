@@ -10,6 +10,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/operator/update_physical_operator.h"
 #include "event/sql_debug.h"
+#include "sql/expr/subquery_expression.h"
 #include "storage/table/table.h"
 #include "storage/trx/trx.h"
 
@@ -20,6 +21,7 @@ RC UpdatePhysicalOperator::open(Trx *trx)
   if (children_.empty()) {
     return RC::SUCCESS;
   }
+  trx_ = trx;
 
   PhysicalOperator *child = children_[0].get();
   RC                rc    = child->open(trx);
@@ -27,8 +29,11 @@ RC UpdatePhysicalOperator::open(Trx *trx)
     LOG_WARN("failed to open child operator: %s", strrc(rc));
     return rc;
   }
-
   auto table_meta = table_->table_meta();
+
+  if (OB_FAIL(rc = init_subqueries())) {
+    return rc;
+  }
 
   std::vector<Record> old_records;
   std::vector<Record> new_records;
@@ -45,16 +50,19 @@ RC UpdatePhysicalOperator::open(Trx *trx)
 
     // create new value list
     std::vector<Value> values;
-    values.reserve(target_expressions_.size());
-    Value tmp;
-    for (const auto &expr : target_expressions_) {
-      rc = expr->get_value(*row_tuple, tmp);
-      if (OB_FAIL(rc)) {
-        LOG_WARN("expression get value failed");
-        return rc;
-      }
-      values.push_back(tmp);
+    if (OB_FAIL(rc = get_new_values(row_tuple, values))) {
+      return rc;
     }
+    /* values.reserve(target_expressions_.size());
+     * Value tmp;
+     * for (const auto &expr : target_expressions_) {
+     *   rc = expr->get_value(*row_tuple, tmp);
+     *   if (OB_FAIL(rc)) {
+     *     LOG_WARN("expression get value failed");
+     *     return rc;
+     *   }
+     *   values.push_back(tmp);
+     * } */
 
     Record new_record;
     rc = table_->make_record(static_cast<int>(values.size()), values.data(), new_record);
@@ -62,28 +70,13 @@ RC UpdatePhysicalOperator::open(Trx *trx)
       LOG_WARN("failed to make record. rc=%s", strrc(rc));
       return rc;
     }
+    // Record old_record;
+    // old_record.copy_data(row_tuple->record().data(), row_tuple->record().len());
+    Record old_record = row_tuple->record().materialize();
 
-    old_records.push_back(std::move(row_tuple->record()));
+    // old_records.push_back(std::move(row_tuple->record()));
+    old_records.push_back(std::move(old_record));
     new_records.push_back(std::move(new_record));
-
-    // delete old record from table;
-    /* rc = trx->delete_record(table_, row_tuple->record());
-     * if (OB_FAIL(rc)) {
-     *   LOG_WARN("failed to delete record. rc=%s", strrc(rc));
-     *   return rc;
-     * } */
-
-    // insert new record into table;
-    /* Record record;
-     * rc = table_->make_record(static_cast<int>(values.size()), values.data(), record);
-     * if (OB_FAIL(rc)) {
-     *   LOG_WARN("failed to make record. rc=%s", strrc(rc));
-     *   return rc;
-     * }
-     * rc = trx->insert_record(table_, record);
-     * if (OB_FAIL(rc)) {
-     *   LOG_WARN("failed to insert record by transaction. rc=%s", strrc(rc));
-     * } */
   }
 
   if (OB_FAIL(rc) && rc != RC::RECORD_EOF) {
@@ -94,13 +87,13 @@ RC UpdatePhysicalOperator::open(Trx *trx)
     return rc;
   }
 
-  for (Record& record: old_records) {
+  for (Record &record : old_records) {
     if (rc = trx->delete_record(table_, record); OB_FAIL(rc)) {
       return rc;
     }
   }
 
-  for (Record& record: new_records) {
+  for (Record &record : new_records) {
     if (rc = trx->insert_record(table_, record); OB_FAIL(rc)) {
       return rc;
     }
@@ -114,3 +107,100 @@ RC UpdatePhysicalOperator::next() { return RC::RECORD_EOF; }
 RC UpdatePhysicalOperator::close() { return RC::SUCCESS; }
 
 Tuple *UpdatePhysicalOperator::current_tuple() { return nullptr; }
+
+RC UpdatePhysicalOperator::get_new_values(RowTuple* row_tuple, vector<Value>& values)
+{
+  RC rc = RC::SUCCESS;
+
+  if (OB_FAIL(rc = open_correlated_subquery(row_tuple))) {
+    return rc;
+  }
+
+  values.reserve(target_expressions_.size());
+  Value tmp;
+  for (const auto &expr : target_expressions_) {
+    rc = expr->get_value(*row_tuple, tmp);
+    if (OB_FAIL(rc)) {
+      LOG_WARN("expression get value failed");
+      return rc;
+    }
+    values.push_back(tmp);
+  }
+
+  if (OB_FAIL(rc = close_correlated_subquery())) {
+    return rc;
+  }
+
+  return rc;
+}
+
+RC UpdatePhysicalOperator::init_subqueries() {
+  RC rc = RC::SUCCESS;
+  for (const auto &expr : target_expressions_) {
+    if (expr->type() != ExprType::SUBQUERY) {
+      continue;
+    }
+
+    auto subquery = static_cast<SubQueryExpr *>(expr.get());
+    if (!subquery->physical_oper()) {
+      continue;
+    }
+
+    TupleSchema schema;
+    if (OB_FAIL(rc = subquery->physical_oper()->tuple_schema(schema))) {
+      return rc;
+    }
+    if (schema.cell_num() != 1) {
+      LOG_WARN("subquery must return only one column");
+      return RC::INVALID_ARGUMENT;
+    }
+
+    if (!subquery->is_correlated()) {
+      if (OB_FAIL(rc = subquery->run_uncorrelated_query(trx_))) {
+        return rc;
+      }
+    }
+  }
+  return rc;
+
+}
+
+RC UpdatePhysicalOperator::open_correlated_subquery(Tuple *env_tuple)
+{
+  RC rc = RC::SUCCESS;
+  for (const auto &expr : target_expressions_) {
+    if (expr->type() != ExprType::SUBQUERY) {
+      continue;
+    }
+
+    auto subquery = static_cast<SubQueryExpr *>(expr.get());
+    if (subquery->is_correlated()) {
+      auto &physical_oper = subquery->physical_oper();
+      physical_oper->set_env_tuple(env_tuple);
+      if (OB_FAIL(rc = physical_oper->open(trx_))) {
+        return rc;
+      }
+    }
+  }
+  return rc;
+}
+
+RC UpdatePhysicalOperator::close_correlated_subquery()
+{
+  RC rc = RC::SUCCESS;
+  for (const auto &expr : target_expressions_) {
+    if (expr->type() != ExprType::SUBQUERY) {
+      continue;
+    }
+
+    auto subquery = static_cast<SubQueryExpr *>(expr.get());
+    if (subquery->is_correlated()) {
+      auto &physical_oper = subquery->physical_oper();
+      physical_oper->set_env_tuple(nullptr);
+      if (OB_FAIL(rc = physical_oper->close())) {
+        return rc;
+      }
+    }
+  }
+  return rc;
+}

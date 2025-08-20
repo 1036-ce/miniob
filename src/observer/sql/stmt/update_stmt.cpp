@@ -24,6 +24,15 @@ See the Mulan PSL v2 for more details. */
  *     : table_(table), values_(values), value_amount_(value_amount)
  * {} */
 
+UpdateStmt::~UpdateStmt()
+{
+  if (nullptr != filter_stmt_) {
+    delete filter_stmt_;
+    filter_stmt_ = nullptr;
+  }
+}
+
+
 RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
 {
   const char *table_name = update.relation_name.c_str();
@@ -52,6 +61,7 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
   }
 
   BinderContext binder_context;
+  binder_context.set_db(db);
   binder_context.add_current_table(table);
   vector<unique_ptr<Expression>> target_expressions;
   ExpressionBinder expression_binder(binder_context);
@@ -90,7 +100,6 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
     }
 
   }
-
 
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;

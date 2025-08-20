@@ -172,6 +172,21 @@ public:
     return *this;
   }
 
+  Record materialize() {
+    Record ret;
+    ret.rid_   = this->rid_;
+    ret.key_   = this->key_;
+    ret.data_  = this->data_;
+    ret.len_   = this->len_;
+    ret.owner_ = true;
+
+    char *tmp = (char *)malloc(this->len_);
+    ASSERT(nullptr != tmp, "failed to allocate memory. size=%d", this->len_);
+    memcpy(tmp, this->data_, this->len_);
+    ret.data_ = tmp;
+    return ret;
+  }
+
   void set_data(char *data, int len = 0)
   {
     this->data_ = data;
