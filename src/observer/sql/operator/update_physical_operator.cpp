@@ -70,6 +70,7 @@ RC UpdatePhysicalOperator::open(Trx *trx)
   }
 
   if (OB_FAIL(rc) && rc != RC::RECORD_EOF) {
+    child->close();
     return rc;
   }
 
