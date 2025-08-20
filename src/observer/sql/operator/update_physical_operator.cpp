@@ -70,10 +70,11 @@ RC UpdatePhysicalOperator::open(Trx *trx)
       LOG_WARN("failed to make record. rc=%s", strrc(rc));
       return rc;
     }
-    // Record old_record = row_tuple->record().materialize();
+    Record old_record;
+    old_record.copy_data(row_tuple->record().data(), row_tuple->record().len());
+    old_record.set_rid(row_tuple->record().rid());
 
-    old_records.push_back(std::move(row_tuple->record()));
-    // old_records.push_back(std::move(old_record));
+    old_records.push_back(std::move(old_record));
     new_records.push_back(std::move(new_record));
   }
 
@@ -95,7 +96,7 @@ RC UpdatePhysicalOperator::open(Trx *trx)
     if (rc = trx->insert_record(table_, record); OB_FAIL(rc)) {
       return rc;
     }
-  } 
+  }
 
   return RC::SUCCESS;
 }
@@ -106,7 +107,7 @@ RC UpdatePhysicalOperator::close() { return RC::SUCCESS; }
 
 Tuple *UpdatePhysicalOperator::current_tuple() { return nullptr; }
 
-RC UpdatePhysicalOperator::get_new_values(RowTuple* row_tuple, vector<Value>& values)
+RC UpdatePhysicalOperator::get_new_values(RowTuple *row_tuple, vector<Value> &values)
 {
   RC rc = RC::SUCCESS;
 
@@ -132,7 +133,8 @@ RC UpdatePhysicalOperator::get_new_values(RowTuple* row_tuple, vector<Value>& va
   return rc;
 }
 
-RC UpdatePhysicalOperator::init_subqueries() {
+RC UpdatePhysicalOperator::init_subqueries()
+{
   RC rc = RC::SUCCESS;
   for (const auto &expr : target_expressions_) {
     if (expr->type() != ExprType::SUBQUERY) {
@@ -160,7 +162,6 @@ RC UpdatePhysicalOperator::init_subqueries() {
     }
   }
   return rc;
-
 }
 
 RC UpdatePhysicalOperator::open_correlated_subquery(Tuple *env_tuple)
