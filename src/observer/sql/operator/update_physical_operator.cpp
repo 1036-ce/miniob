@@ -70,12 +70,10 @@ RC UpdatePhysicalOperator::open(Trx *trx)
       LOG_WARN("failed to make record. rc=%s", strrc(rc));
       return rc;
     }
-    // Record old_record;
-    // old_record.copy_data(row_tuple->record().data(), row_tuple->record().len());
-    Record old_record = row_tuple->record().materialize();
+    // Record old_record = row_tuple->record().materialize();
 
-    // old_records.push_back(std::move(row_tuple->record()));
-    old_records.push_back(std::move(old_record));
+    old_records.push_back(std::move(row_tuple->record()));
+    // old_records.push_back(std::move(old_record));
     new_records.push_back(std::move(new_record));
   }
 
@@ -97,7 +95,7 @@ RC UpdatePhysicalOperator::open(Trx *trx)
     if (rc = trx->insert_record(table_, record); OB_FAIL(rc)) {
       return rc;
     }
-  }
+  } 
 
   return RC::SUCCESS;
 }
