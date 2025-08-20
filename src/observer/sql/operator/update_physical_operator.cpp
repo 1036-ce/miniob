@@ -44,6 +44,7 @@ RC UpdatePhysicalOperator::open(Trx *trx)
     }
     auto row_tuple = dynamic_cast<RowTuple *>(child->current_tuple());
     if (!row_tuple) {
+      child->close();
       LOG_WARN("update physical operator's tuple is not RowTuple");
       return RC::INTERNAL;
     }
@@ -51,22 +52,14 @@ RC UpdatePhysicalOperator::open(Trx *trx)
     // create new value list
     std::vector<Value> values;
     if (OB_FAIL(rc = get_new_values(row_tuple, values))) {
+      child->close();
       return rc;
     }
-    /* values.reserve(target_expressions_.size());
-     * Value tmp;
-     * for (const auto &expr : target_expressions_) {
-     *   rc = expr->get_value(*row_tuple, tmp);
-     *   if (OB_FAIL(rc)) {
-     *     LOG_WARN("expression get value failed");
-     *     return rc;
-     *   }
-     *   values.push_back(tmp);
-     * } */
 
     Record new_record;
     rc = table_->make_record(static_cast<int>(values.size()), values.data(), new_record);
     if (OB_FAIL(rc)) {
+      child->close();
       LOG_WARN("failed to make record. rc=%s", strrc(rc));
       return rc;
     }
