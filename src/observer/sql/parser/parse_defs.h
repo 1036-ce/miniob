@@ -209,6 +209,16 @@ struct AttrInfoSqlNode
 };
 
 /**
+ * @brief 描述一个create view语句
+ * @ingroup SQLParser
+ **/
+
+struct CreateViewSqlNode {
+  string view_name;
+  string select_sql;
+};
+
+/**
  * @brief 描述一个create table语句
  * @ingroup SQLParser
  * @details 这里也做了很多简化。
@@ -337,6 +347,7 @@ enum SqlCommandFlag
   SCF_INSERT,
   SCF_UPDATE,
   SCF_DELETE,
+  SCF_CREATE_VIEW,
   SCF_CREATE_TABLE,
   SCF_DROP_TABLE,
   SCF_ANALYZE_TABLE,
@@ -369,6 +380,7 @@ public:
   InsertSqlNode       insertion;
   DeleteSqlNode       deletion;
   UpdateSqlNode       update;
+  CreateViewSqlNode   create_view;
   CreateTableSqlNode  create_table;
   DropTableSqlNode    drop_table;
   AnalyzeTableSqlNode analyze_table;

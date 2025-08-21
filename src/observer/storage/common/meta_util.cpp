@@ -38,3 +38,7 @@ string table_index_file(const char *base_dir, const char *table_name, const char
 string table_lob_file(const char *base_dir, const char *table_name) {
   return filesystem::path(base_dir) / (string(table_name) + TABLE_LOB_SUFFIX);
 }
+
+string view_file(const char* base_dir, const char* view_name) {
+  return filesystem::path(base_dir) / (string(view_name) + VIEW_SUFFIX);
+}

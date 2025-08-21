@@ -79,6 +79,7 @@ SubQueryExpr *create_subquery_expression(const vector<Value>& value_list) {
         CREATE
         DROP
         GROUP
+        VIEW
         TABLE
         TABLES
         INDEX
@@ -213,6 +214,7 @@ SubQueryExpr *create_subquery_expression(const vector<Value>& value_list) {
 %type <sql_node>            insert_stmt
 %type <sql_node>            update_stmt
 %type <sql_node>            delete_stmt
+%type <sql_node>            create_view_stmt
 %type <sql_node>            create_table_stmt
 %type <sql_node>            drop_table_stmt
 %type <sql_node>            analyze_table_stmt
@@ -252,6 +254,7 @@ command_wrapper:
   | insert_stmt
   | update_stmt
   | delete_stmt
+  | create_view_stmt
   | create_table_stmt
   | drop_table_stmt
   | analyze_table_stmt
@@ -351,6 +354,16 @@ drop_index_stmt:      /*drop index 语句的语法解析树*/
       $$ = new ParsedSqlNode(SCF_DROP_INDEX);
       $$->drop_index.index_name = $3;
       $$->drop_index.relation_name = $5;
+    }
+    ;
+create_view_stmt:
+    CREATE VIEW ID AS_T select_stmt 
+    {
+      $$ = new ParsedSqlNode(SCF_CREATE_VIEW);
+      CreateViewSqlNode &create_view = $$->create_view;
+      create_view.view_name = $3;
+      create_view.select_sql = token_name(sql_string, &@5);
+      delete $5;
     }
     ;
 create_table_stmt:    /*create table 语句的语法解析树*/

@@ -13,3 +13,6 @@ UPDATE ust1 SET col1=2, col2=(select ust2.col2 from ust2 where ust2.id=1) WHERE 
 SELECT * FROM ust1;
 UPDATE ust1 SET col1=2, col2=(select ust2.col2 from ust2 where ust2.col2=ust1.col2) WHERE id=2;
 SELECT * FROM ust1;
+UPDATE ust2 SET col1=(select ust1.col1 from ust1 where ust1.id=1),col2=(select ust1.col2 from ust1 where ust1.id=4) where id=2;
+
+UPDATE ust1 SET t_name='HJGEVHI', col2=9 WHERE id=7;

@@ -25,6 +25,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/clog/disk_log_handler.h"
 #include "storage/buffer/double_write_buffer.h"
 #include "oblsm/include/ob_lsm.h"
+#include "storage/view/view.h"
 
 class Table;
 class LogHandler;
@@ -71,6 +72,13 @@ public:
       const StorageFormat storage_format = StorageFormat::ROW_FORMAT);
 
   /**
+   * @brief 创建一个视图
+   * @param view_name 视图名
+   * @param select_sql select_sql字符串
+   */
+  RC create_view(const string& view_name, const string& select_sql);
+
+  /**
    * @brief 删除一个表
    * @param table_name 表名
    */
@@ -113,6 +121,10 @@ public:
 private:
   /// @brief 打开所有的表。在数据库初始化的时候会执行
   RC open_all_tables();
+
+  /// @brief 打开所有的视图。在数据库初始化的时候会执行
+  RC open_all_views();
+
   /// @brief 恢复数据。在数据库初始化的时候运行。
   RC recover();
 
@@ -143,6 +155,7 @@ private:
   string                         name_;                 ///< 数据库名称
   string                         path_;                 ///< 数据库文件存放的目录
   unordered_map<string, Table *> opened_tables_;        ///< 当前所有打开的表
+  unordered_map<string, View*>   opened_views_;         ///< 当前所有打开的视图
   unique_ptr<BufferPoolManager>  buffer_pool_manager_;  ///< 当前数据库的buffer pool管理器
   unique_ptr<LogHandler>         log_handler_;          ///< 当前数据库的日志处理器
   unique_ptr<TrxKit>             trx_kit_;              ///< 当前数据库的事务管理器

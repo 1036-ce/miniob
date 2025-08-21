@@ -36,6 +36,10 @@ Db::~Db()
     delete iter.second;
   }
 
+  for (auto &iter: opened_views_) {
+    delete iter.second;
+  }
+
   if (log_handler_) {
     // 停止日志并等待写入完成
     log_handler_->stop();
@@ -135,6 +139,13 @@ RC Db::init(const char *name, const char *dbpath, const char *trx_kit_name, cons
     return rc;
   }
 
+  // 打开所有视图
+  rc = open_all_views();
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to open all views. dbpath=%s, rc=%s", dbpath, strrc(rc));
+    return rc;
+  }
+
   rc = init_dblwr_buffer();
   if (OB_FAIL(rc)) {
     LOG_WARN("failed to init dblwr buffer. rc = %s", strrc(rc));
@@ -183,6 +194,28 @@ RC Db::create_table(const char *table_name, span<const AttrInfoSqlNode> attribut
   opened_tables_[table_name] = table;
   LOG_INFO("Create table success. table name=%s, table_id:%d", table_name, table_id);
   return RC::SUCCESS;
+}
+
+RC Db::create_view(const string& view_name, const string& select_sql) {
+  RC rc = RC::SUCCESS;
+  // check view_name
+  if (opened_views_.count(view_name) != 0) {
+    LOG_WARN("%s has been opened before.", view_name.c_str());
+    return RC::SCHEMA_TABLE_EXIST;
+  }
+
+  string  view_file_path = view_file(path_.c_str(), view_name.c_str());
+  View *view = new View();
+  rc = view->create(this, view_file_path.c_str(), view_name.c_str(), path_.c_str(), select_sql);
+  if (OB_FAIL(rc)) {
+    LOG_ERROR("Failed to create view %s.", view_name.c_str());
+    delete view;
+    return rc;
+  }
+
+  opened_views_[view_name] = view;
+  LOG_INFO("Create view success. table name=%s", view_name.c_str());
+  return rc;
 }
 
 RC Db::drop_table(const char *table_name)
@@ -262,6 +295,33 @@ RC Db::open_all_tables()
   }
 
   LOG_INFO("All table have been opened. num=%d", opened_tables_.size());
+  return rc;
+}
+
+RC Db::open_all_views() {
+  vector<string> view_files;
+
+  int ret = list_file(path_.c_str(), VIEW_FILE_PATTERN, view_files);
+  if (ret < 0) {
+    LOG_ERROR("Failed to list view files under %s.", path_.c_str());
+    return RC::IOERR_READ;
+  }
+
+  RC rc = RC::SUCCESS;
+  for (const string &filename : view_files) {
+    View *view = new View();
+    rc = view->open(this, filename.c_str(), path_.c_str());
+    if (OB_FAIL(rc)) {
+      delete view;
+      LOG_ERROR("failed to open view. filename=%s", filename.c_str());
+      return rc;
+    }
+
+    opened_views_[filename] = view;
+    LOG_INFO("Open view: %s", filename.c_str());
+  }
+
+  LOG_INFO("All view have been opened. num=%d", opened_views_.size());
   return rc;
 }
 

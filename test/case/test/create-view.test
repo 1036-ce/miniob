@@ -1,0 +1,38 @@
+create table t_basic(id int, age int, name char, score float);
+insert into t_basic values(1,1, 'a', 1.0);
+insert into t_basic values(2,2, 'b', 2.0);
+insert into t_basic values(4,4, 'c', 3.0);
+insert into t_basic values(3,3, 'd', 4.0);
+insert into t_basic values(5,5, 'e', 5.5);
+insert into t_basic values(6,6, 'f', 6.6);
+insert into t_basic values(7,7, 'g', 7.7);
+
+create view cv1 as select * from t_basic;
+select * from cv1;
+
+create view cv2 as select count(id) from t_basic;
+insert into cv2 values(1);
+insert into t_basic values(8,8, 'h', 8.8);
+select * from cv2;
+
+create view cv3 as select id*2, age from t_basic;
+select * from cv3;
+insert into cv3 values(12, 8);
+insert into t_basic values(9,9, 'j', 9.9);
+select * from cv3;
+
+create view cv4 as select id, age from t_basic;
+select * from cv4;
+insert into cv4 values(10, 10);
+select * from cv4;
+select * from t_basic;
+
+create view cv5 as select id, score from t_basic;
+select * from cv5;
+insert into cv5 values(11, 11.11);
+select * from cv5;
+select * from t_basic;
+
+create view cv6 as select id*2 as id2, age from t_basic;
+select * from cv6;
+select id2 from cv6;
