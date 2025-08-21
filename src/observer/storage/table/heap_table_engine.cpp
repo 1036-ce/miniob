@@ -96,6 +96,7 @@ RC HeapTableEngine::make_record(int value_num, const Value *values, Record &reco
   for (int i = 0; i < value_num && OB_SUCC(rc); i++) {
     const FieldMeta *field = table_meta_->field(i + normal_field_start_index);
     const Value     &value = values[i];
+
     if (field->type() != value.attr_type()) {
       Value real_value;
       if (field->type() == AttrType::TEXT && value.attr_type() == AttrType::CHARS) {

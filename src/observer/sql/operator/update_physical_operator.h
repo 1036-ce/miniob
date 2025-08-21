@@ -40,7 +40,7 @@ public:
   Tuple *current_tuple() override;
 
 private:
-  RC get_new_values(RowTuple* row_tuple, vector<Value>& values);
+  RC get_new_values(const vector<FieldMeta>& field_metas, RowTuple* row_tuple, vector<Value>& values);
   RC init_subqueries();
   RC open_correlated_subquery(Tuple *env_tuple);
   RC close_correlated_subquery();

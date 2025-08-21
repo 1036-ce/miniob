@@ -30,6 +30,10 @@ RC UpdatePhysicalOperator::open(Trx *trx)
     return rc;
   }
   auto table_meta = table_->table_meta();
+  vector<FieldMeta> visible_field_metas;
+  for (int i = table_meta.unvisible_field_num(); i < table_meta.field_num(); ++i) {
+    visible_field_metas.push_back(*table_meta.field(i));
+  }
 
   if (OB_FAIL(rc = init_subqueries())) {
     return rc;
@@ -51,7 +55,7 @@ RC UpdatePhysicalOperator::open(Trx *trx)
 
     // create new value list
     std::vector<Value> values;
-    if (OB_FAIL(rc = get_new_values(row_tuple, values))) {
+    if (OB_FAIL(rc = get_new_values(visible_field_metas, row_tuple, values))) {
       child->close();
       return rc;
     }
@@ -106,7 +110,7 @@ RC UpdatePhysicalOperator::close() { return RC::SUCCESS; }
 
 Tuple *UpdatePhysicalOperator::current_tuple() { return nullptr; }
 
-RC UpdatePhysicalOperator::get_new_values(RowTuple *row_tuple, vector<Value> &values)
+RC UpdatePhysicalOperator::get_new_values(const vector<FieldMeta>& field_metas, RowTuple* row_tuple, vector<Value>& values)
 {
   RC rc = RC::SUCCESS;
 
@@ -116,11 +120,17 @@ RC UpdatePhysicalOperator::get_new_values(RowTuple *row_tuple, vector<Value> &va
 
   values.reserve(target_expressions_.size());
   Value tmp;
-  for (const auto &expr : target_expressions_) {
+  // for (const auto &expr : target_expressions_) {
+  for (size_t i = 0; i < target_expressions_.size(); ++i) {
+    const auto& expr = target_expressions_.at(i);
+    const auto& field_meta = field_metas.at(i);
     rc = expr->get_value(*row_tuple, tmp);
     if (OB_FAIL(rc)) {
       LOG_WARN("expression get value failed");
       return rc;
+    }
+    if (tmp.is_null() && !field_meta.nullable()) {
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }
     values.push_back(tmp);
   }
