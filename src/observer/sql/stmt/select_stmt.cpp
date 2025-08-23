@@ -45,7 +45,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
 
   // collect tables in `from` statement
   unordered_map<string, Table *> table_map;
-  if (OB_FAIL(rc = collect_tables(db, select_sql.table_refs.get(), table_map, binder_context))) {
+  if (OB_FAIL(rc = collect_tables(db, select_sql.table_refs.get(), binder_context))) {
     return rc;
   }
 
@@ -55,7 +55,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
 
   // unique_ptr<BoundTable> tables = bind_tables(table_map, expression_binder, select_sql.table_refs.get());
   unique_ptr<BoundTable> tables;
-  if (OB_FAIL(rc = bind_tables(table_map, expression_binder, select_sql.table_refs.get(), tables))) {
+  if (OB_FAIL(rc = bind_tables(binder_context, expression_binder, select_sql.table_refs.get(), tables))) {
     return rc;
   }
 
@@ -138,7 +138,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, BinderCont
   unordered_map<string, Table *> table_map;
 
   // collect tables in `from` statement
-  if (OB_FAIL(rc = collect_tables(db, select_sql.table_refs.get(), table_map, binder_context))) {
+  if (OB_FAIL(rc = collect_tables(db, select_sql.table_refs.get(), binder_context))) {
     return rc;
   }
 
@@ -148,7 +148,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, BinderCont
 
   // unique_ptr<BoundTable> tables = bind_tables(table_map, expression_binder, select_sql.table_refs.get());
   unique_ptr<BoundTable> tables;
-  if (OB_FAIL(rc = bind_tables(table_map, expression_binder, select_sql.table_refs.get(), tables))) {
+  if (OB_FAIL(rc = bind_tables(binder_context, expression_binder, select_sql.table_refs.get(), tables))) {
     return rc;
   }
 
@@ -209,7 +209,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, BinderCont
 }
 
 auto SelectStmt::collect_tables(
-    Db *db, UnboundTable *unbound_table, unordered_map<string, Table *> &table_map, BinderContext &binder_context) -> RC
+    Db *db, UnboundTable *unbound_table, BinderContext &binder_context) -> RC
 {
   if (UnboundSingleTable *single_table = dynamic_cast<UnboundSingleTable *>(unbound_table); single_table != nullptr) {
     const char *table_name = single_table->relation_name.c_str();
@@ -223,14 +223,17 @@ auto SelectStmt::collect_tables(
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
 
-    table_map.insert({table_name, table});
+    // table_map.insert({table_name, table});
     binder_context.add_current_table(table);
     if (!single_table->alias_name.empty()) {
       const char* alias_name = single_table->alias_name.c_str();
-      if (table_map.contains(alias_name)) {
+      if (binder_context.find_current_table(alias_name)) {
         return RC::INVALID_ARGUMENT;
       }
-      table_map.insert({alias_name, table});
+      /* if (table_map.contains(alias_name)) {
+       *   return RC::INVALID_ARGUMENT;
+       * }
+       * table_map.insert({alias_name, table}); */
       binder_context.add_current_table(alias_name, table);
     }
     
@@ -241,10 +244,10 @@ auto SelectStmt::collect_tables(
     RC   rc    = RC::SUCCESS;
     auto left  = joined_table->left.get();
     auto right = joined_table->right.get();
-    if (OB_FAIL(rc = collect_tables(db, left, table_map, binder_context))) {
+    if (OB_FAIL(rc = collect_tables(db, left, binder_context))) {
       return rc;
     }
-    if (OB_FAIL(rc = collect_tables(db, right, table_map, binder_context))) {
+    if (OB_FAIL(rc = collect_tables(db, right, binder_context))) {
       return rc;
     }
     return RC::SUCCESS;
@@ -253,12 +256,13 @@ auto SelectStmt::collect_tables(
   return RC::UNSUPPORTED;
 }
 
-RC SelectStmt::bind_tables(const unordered_map<string, Table *> &table_map, ExpressionBinder &expr_binder,
+RC SelectStmt::bind_tables(const BinderContext& binder_context, ExpressionBinder &expr_binder,
     UnboundTable *unbound_table, unique_ptr<BoundTable> &bound_table)
 {
   if (UnboundSingleTable *single_table = dynamic_cast<UnboundSingleTable *>(unbound_table); single_table != nullptr) {
     // single_table->relation_name 一定存在
-    Table *table = table_map.at(single_table->relation_name);
+    // Table *table = table_map.at(single_table->relation_name);
+    Table *table = binder_context.find_current_table(single_table->relation_name.c_str());
     bound_table  = make_unique<BoundSingleTable>(table);
     return RC::SUCCESS;
   }
@@ -266,10 +270,10 @@ RC SelectStmt::bind_tables(const unordered_map<string, Table *> &table_map, Expr
   RC rc = RC::SUCCESS;
   if (UnboundJoinedTable *joined_table = dynamic_cast<UnboundJoinedTable *>(unbound_table); joined_table != nullptr) {
     unique_ptr<BoundTable> left_table, right_table;
-    if (OB_FAIL(rc = bind_tables(table_map, expr_binder, joined_table->left.get(), left_table))) {
+    if (OB_FAIL(rc = bind_tables(binder_context, expr_binder, joined_table->left.get(), left_table))) {
       return rc;
     }
-    if (OB_FAIL(rc = bind_tables(table_map, expr_binder, joined_table->right.get(), right_table))) {
+    if (OB_FAIL(rc = bind_tables(binder_context, expr_binder, joined_table->right.get(), right_table))) {
       return rc;
     }
 
