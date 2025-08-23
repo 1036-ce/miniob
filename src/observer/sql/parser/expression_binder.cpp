@@ -58,7 +58,7 @@ static void wildcard_fields(Table *table, vector<unique_ptr<Expression>> &expres
   // 通配符会扩展为所有**可见**的field
   for (int i = table_meta.unvisible_field_num(); i < field_num; i++) {
     Field      field(table, table_meta.field(i));
-    FieldExpr *field_expr = new FieldExpr(field);
+    TableFieldExpr *field_expr = new TableFieldExpr(field);
 
     string expr_name;
     if (table_cnt > 1) {
@@ -92,7 +92,7 @@ RC ExpressionBinder::bind_expression(unique_ptr<Expression> &expr, vector<unique
       return bind_aggregate_expression(expr, bound_expressions);
     } break;
 
-    case ExprType::FIELD: {
+    case ExprType::TABLE_FIELD: {
       return bind_field_expression(expr, bound_expressions);
     } break;
 
@@ -206,7 +206,7 @@ RC ExpressionBinder::bind_unbound_field_expression(
     }
 
     Field      field(table, field_meta);
-    FieldExpr *field_expr = new FieldExpr(field);
+    TableFieldExpr *field_expr = new TableFieldExpr(field);
 
     if (!unbound_field_expr->alias_name().empty()) {
       field_expr->set_name(unbound_field_expr->alias_name());

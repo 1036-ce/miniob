@@ -41,7 +41,7 @@ enum class ExprType
   UNBOUND_FIELD,        ///< 未绑定的字段，需要在resolver阶段解析为FieldExpr
   UNBOUND_AGGREGATION,  ///< 未绑定的聚合函数，需要在resolver阶段解析为AggregateExpr
 
-  FIELD,        ///< 字段。在实际执行时，根据行数据内容提取对应字段的值
+  TABLE_FIELD,        ///< 字段。在实际执行时，根据行数据内容提取对应字段的值
   VALUE,        ///< 常量值
   CAST,         ///< 需要做类型转换的表达式
   COMPARISON,   ///< 需要做比较的表达式
@@ -204,20 +204,20 @@ private:
  * @brief 字段表达式
  * @ingroup Expression
  */
-class FieldExpr : public Expression
+class TableFieldExpr : public Expression
 {
 public:
-  FieldExpr() = default;
-  FieldExpr(const Table *table, const FieldMeta *field) : field_(table, field) {}
-  FieldExpr(const Field &field) : field_(field) {}
+  TableFieldExpr() = default;
+  TableFieldExpr(const Table *table, const FieldMeta *field) : field_(table, field) {}
+  TableFieldExpr(const Field &field) : field_(field) {}
 
-  virtual ~FieldExpr() = default;
+  virtual ~TableFieldExpr() = default;
 
   bool equal(const Expression &other) const override;
 
-  unique_ptr<Expression> copy() const override { return make_unique<FieldExpr>(field_); }
+  unique_ptr<Expression> copy() const override { return make_unique<TableFieldExpr>(field_); }
 
-  ExprType type() const override { return ExprType::FIELD; }
+  ExprType type() const override { return ExprType::TABLE_FIELD; }
   AttrType value_type() const override { return field_.attr_type(); }
   int      value_length() const override { return field_.meta()->len(); }
 

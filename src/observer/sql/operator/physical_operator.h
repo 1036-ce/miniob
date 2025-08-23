@@ -43,6 +43,7 @@ enum class PhysicalOperatorType
   EXPLAIN,
   PREDICATE,
   PREDICATE_VEC,
+  VIEW_PROJECT,
   PROJECT,
   PROJECT_VEC,
   CALC,

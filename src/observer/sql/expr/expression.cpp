@@ -38,12 +38,12 @@ string comp2str(CompOp comp)
   }
 }
 
-RC FieldExpr::get_value(const Tuple &tuple, Value &value) const
+RC TableFieldExpr::get_value(const Tuple &tuple, Value &value) const
 {
   return tuple.find_cell(TupleCellSpec(table_name(), field_name()), value);
 }
 
-RC FieldExpr::related_tables(vector<const Table *> &tables) const
+RC TableFieldExpr::related_tables(vector<const Table *> &tables) const
 {
   const Table *cur_table = field_.table();
   for (auto table : tables) {
@@ -55,21 +55,21 @@ RC FieldExpr::related_tables(vector<const Table *> &tables) const
   return RC::SUCCESS;
 }
 
-bool FieldExpr::equal(const Expression &other) const
+bool TableFieldExpr::equal(const Expression &other) const
 {
   if (this == &other) {
     return true;
   }
-  if (other.type() != ExprType::FIELD) {
+  if (other.type() != ExprType::TABLE_FIELD) {
     return false;
   }
-  const auto &other_field_expr = static_cast<const FieldExpr &>(other);
+  const auto &other_field_expr = static_cast<const TableFieldExpr &>(other);
   return table_name() == other_field_expr.table_name() && field_name() == other_field_expr.field_name();
 }
 
 // TODO: 在进行表达式计算时，`chunk` 包含了所有列，因此可以通过 `field_id` 获取到对应列。
 // 后续可以优化成在 `FieldExpr` 中存储 `chunk` 中某列的位置信息。
-RC FieldExpr::get_column(Chunk &chunk, Column &column)
+RC TableFieldExpr::get_column(Chunk &chunk, Column &column)
 {
   if (pos_ != -1) {
     column.reference(chunk.column(pos_));

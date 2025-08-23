@@ -83,7 +83,7 @@ RC ExpressionRewriter::rewrite_expression(unique_ptr<Expression> &expr, bool &ch
   }
 
   switch (expr->type()) {
-    case ExprType::FIELD:
+    case ExprType::TABLE_FIELD:
     case ExprType::VALUE: {
       // do nothing
     } break;

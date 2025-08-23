@@ -49,7 +49,7 @@ RC FilterStmt::create(Db *db, Table *default_table, unordered_map<string, Table 
 
   stmt = new FilterStmt(std::move(bound_expressions.front()));
   return RC::SUCCESS;
-}
+} 
 
 RC FilterStmt::create(Db *db, BinderContext& binder_context, unique_ptr<Expression> predicate, FilterStmt *&stmt) {
   if (predicate == nullptr) {
@@ -58,6 +58,7 @@ RC FilterStmt::create(Db *db, BinderContext& binder_context, unique_ptr<Expressi
   }
 
   RC            rc = RC::SUCCESS;
+  binder_context.set_db(db);
   vector<unique_ptr<Expression>> bound_expressions;
   ExpressionBinder               expression_binder(binder_context);
 

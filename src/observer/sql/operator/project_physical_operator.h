@@ -47,6 +47,8 @@ public:
 
   RC tuple_schema(TupleSchema &schema) const override;
 
+  vector<unique_ptr<Expression>>&& expressions() { return std::move(expressions_); }
+
 private:
   vector<unique_ptr<Expression>>          expressions_;
   ExpressionTuple<unique_ptr<Expression>> tuple_;

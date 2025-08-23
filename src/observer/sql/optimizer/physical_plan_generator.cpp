@@ -177,14 +177,14 @@ RC PhysicalPlanGenerator::create_plan(
         continue;
       }
 
-      FieldExpr *field_expr = nullptr;
-      if (left_expr->type() == ExprType::FIELD) {
+      TableFieldExpr *field_expr = nullptr;
+      if (left_expr->type() == ExprType::TABLE_FIELD) {
         ASSERT(right_expr->type() == ExprType::VALUE, "right expr should be a value expr while left is field expr");
-        field_expr = static_cast<FieldExpr *>(left_expr.get());
+        field_expr = static_cast<TableFieldExpr *>(left_expr.get());
         value_expr = static_cast<ValueExpr *>(right_expr.get());
-      } else if (right_expr->type() == ExprType::FIELD) {
+      } else if (right_expr->type() == ExprType::TABLE_FIELD) {
         ASSERT(left_expr->type() == ExprType::VALUE, "left expr should be a value expr while right is a field expr");
-        field_expr = static_cast<FieldExpr *>(right_expr.get());
+        field_expr = static_cast<TableFieldExpr *>(right_expr.get());
         value_expr = static_cast<ValueExpr *>(left_expr.get());
       }
 

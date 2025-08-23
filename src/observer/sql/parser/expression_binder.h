@@ -15,6 +15,26 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include "sql/expr/expression.h"
+#include "storage/view/view.h"
+
+class DataSource
+{
+public:
+  DataSource(Table *table) : table_(table) {}
+  DataSource(View *view) : view_(view) {}
+
+  string name()
+  {
+    if (table_) {
+      return table_->name();
+    }
+    return view_->name();
+  }
+
+private:
+  Table *table_ = nullptr;
+  View  *view_  = nullptr;
+};
 
 class BinderContext
 {
@@ -30,14 +50,8 @@ public:
       unique_tables_.insert(table);
     }
   }
-  void add_outer_table(Table *table)
-  {
-    outer_query_tables_.push_back(table);
-  }
-  void add_used_outer_table(Table *table)
-  {
-    used_outer_tables_.push_back(table);
-  }
+  void add_outer_table(Table *table) { outer_query_tables_.push_back(table); }
+  void add_used_outer_table(Table *table) { used_outer_tables_.push_back(table); }
 
   void add_current_table(const string &alias_name, Table *table)
   {
@@ -51,11 +65,12 @@ public:
     }
   }
 
-  void clear_current_table() { 
-    current_query_tables_.clear(); 
+  void clear_current_table()
+  {
+    current_query_tables_.clear();
     table_map_.clear();
   }
-  void clear_outer_table() { outer_query_tables_.clear(); } 
+  void clear_outer_table() { outer_query_tables_.clear(); }
 
   Table *find_table(const char *table_name) const;
   Table *find_outer_table(const char *table_name) const;
@@ -67,13 +82,14 @@ public:
   void set_db(Db *db) { db_ = db; }
   Db  *db() { return db_; }
 
-  BinderContext gen_sub_context() const {
+  BinderContext gen_sub_context() const
+  {
     BinderContext sub_context;
-    sub_context.db_ = this->db_;
-    sub_context.table_map_ = this->table_map_;
-    sub_context.unique_tables_ = this->unique_tables_;
+    sub_context.db_                 = this->db_;
+    sub_context.table_map_          = this->table_map_;
+    sub_context.unique_tables_      = this->unique_tables_;
     sub_context.outer_query_tables_ = this->outer_query_tables_;
-    for (auto table: this->current_query_tables_) {
+    for (auto table : this->current_query_tables_) {
       sub_context.outer_query_tables_.push_back(table);
     }
     sub_context.used_outer_tables_.clear();
@@ -86,8 +102,10 @@ private:
   vector<Table *> outer_query_tables_;
   vector<Table *> used_outer_tables_;
 
-  struct Hash {
-    std::size_t operator()(const string& s) const {
+  struct Hash
+  {
+    std::size_t operator()(const string &s) const
+    {
       string t = s;
       for (char &c : t) {
         c = std::tolower(c);
@@ -102,7 +120,7 @@ private:
   };
 
   unordered_map<string, Table *, Hash, EqualTo> table_map_;
-  unordered_set<Table*> unique_tables_;
+  unordered_set<Table *>                        unique_tables_;
 };
 
 /**
