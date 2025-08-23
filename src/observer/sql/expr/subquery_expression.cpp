@@ -24,13 +24,13 @@ RC SubQueryExpr::build_select_stmt(BinderContext& binder_context)
   } 
   select_stmt_.reset(static_cast<SelectStmt *>(stmt));
 
-  for (auto table: sub_binder_context.used_outer_tables()) {
-    if (binder_context.find_outer_table(table->name()) != nullptr) {
-      binder_context.add_used_outer_table(table);
+  for (auto table: sub_binder_context.used_outer_data_sources()) {
+    if (binder_context.find_outer_data_source(table.name().c_str())) {
+      binder_context.add_used_outer_data_source(table);
     }
   }
 
-  is_correlated_ = !sub_binder_context.used_outer_tables().empty();
+  is_correlated_ = !sub_binder_context.used_outer_data_sources().empty();
   if (is_correlated_) {
     LOG_DEBUG("a correlated subquery occured");
   }

@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/parser/expression_binder.h"
 #include "sql/stmt/stmt.h"
 #include "storage/field/field.h"
+#include "storage/data_source/data_source.h"
 
 class FieldMeta;
 class FilterStmt;
@@ -34,12 +35,17 @@ public:
 class BoundSingleTable : public BoundTable
 {
 public:
-  BoundSingleTable(Table *table) : table_(table) {}
+  BoundSingleTable(Table *table) : data_source_(table) {}
+  BoundSingleTable(View *view) : data_source_(view) {}
+  BoundSingleTable(const DataSource& ds) : data_source_(ds) {}
 
-  Table *table() const { return table_; }
+  Table *table() const { return data_source_.table(); }
+  View  *view() const { return data_source_.view(); }
+  const DataSource& data_source() const { return data_source_; }
 
 private:
-  Table *table_;
+  DataSource data_source_;
+  // Table *table_;
 };
 
 class BoundJoinedTable : public BoundTable
@@ -81,7 +87,7 @@ public:
 public:
   static RC create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt);
   // for subquery
-  static RC create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, BinderContext& binder_context);
+  static RC create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, BinderContext &binder_context);
 
 public:
   const unique_ptr<BoundTable> &table_tree() const { return table_tree_; }
@@ -94,10 +100,9 @@ public:
   vector<unique_ptr<OrderBy>>    &order_by() { return order_by_; }
 
 private:
-  static auto collect_tables(
-      Db *db, UnboundTable *table_ref, BinderContext &binder_context) -> RC;
-  static RC bind_tables(const BinderContext& binder_context, ExpressionBinder &expr_binder,
-      UnboundTable *unbound_table, unique_ptr<BoundTable>& bound_table);
+  static auto collect_tables(Db *db, UnboundTable *table_ref, BinderContext &binder_context) -> RC;
+  static RC bind_tables(const BinderContext &binder_context, ExpressionBinder &expr_binder, UnboundTable *unbound_table,
+      unique_ptr<BoundTable> &bound_table);
 
   vector<unique_ptr<Expression>> query_expressions_;
   unique_ptr<BoundTable>         table_tree_;

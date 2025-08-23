@@ -14,41 +14,49 @@ public:
   ViewFieldMeta(const Expression &expr)
   {
     if (expr.type() == ExprType::TABLE_FIELD) {
-      auto& table_field_expr = static_cast<const TableFieldExpr&>(expr);
-      name_                 = table_field_expr.name();
-      original_table_name_  = table_field_expr.table_name();
-      original_field_name_  = table_field_expr.field_name(); 
-    }
-    else {
-      name_ = expr.name();
+      auto &table_field_expr = static_cast<const TableFieldExpr &>(expr);
+      name_                  = table_field_expr.name();
+      original_table_name_   = table_field_expr.table_name();
+      original_field_name_   = table_field_expr.field_name();
+    } else {
+      name_                = expr.name();
       original_table_name_ = "";
       original_field_name_ = "";
     }
+    type_   = expr.value_type();
+    length_ = expr.value_length();
   }
   ViewFieldMeta(const string &name, const string &original_table_name, const string &original_field_name)
       : name_(name), original_table_name_(original_table_name), original_field_name_(original_table_name)
   {}
   ~ViewFieldMeta() = default;
 
-  RC init(const string &name, const string &original_table_name, const string &original_field_name)
+  RC init(const string &name, const string &original_table_name, const string &original_field_name, AttrType type,
+      int length)
   {
     name_                = name;
     original_table_name_ = original_table_name;
     original_field_name_ = original_field_name;
+    type_                = type;
+    length_              = length;
     return RC::SUCCESS;
   }
 
   const string &name() const { return name_; }
   const string &original_table_name() const { return original_table_name_; }
   const string &original_field_name() const { return original_field_name_; }
+  AttrType      type() const { return type_; }
+  int           length() const { return length_; }
 
   void      to_json(Json::Value &json_value) const;
   static RC from_json(const Json::Value &json_value, ViewFieldMeta &field);
 
 private:
-  string name_;
-  string original_table_name_;
-  string original_field_name_;
+  string   name_;
+  string   original_table_name_;
+  string   original_field_name_;
+  AttrType type_;
+  int      length_;
 };
 
 /**
@@ -68,8 +76,9 @@ public:
    * RC gen_physical_plan(); */
 
   const string                &name() const { return name_; }
-  const string                &select_sql() const{ return select_sql_; }
+  const string                &select_sql() const { return select_sql_; }
   const vector<ViewFieldMeta> &field_metas() const { return field_metas_; }
+  const ViewFieldMeta         *field_meta(const string &name) const;
 
 private:
   RC create_select_stmt(Db *db, const string &select_sql, unique_ptr<SelectStmt> &select_stmt);

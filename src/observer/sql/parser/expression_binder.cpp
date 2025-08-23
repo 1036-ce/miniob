@@ -18,58 +18,73 @@ See the Mulan PSL v2 for more details. */
 #include "sql/parser/expression_binder.h"
 #include "sql/expr/expression_iterator.h"
 #include "sql/expr/subquery_expression.h"
+#include "sql/expr/view_field_expr.h"
 
 using namespace common;
 
-Table *BinderContext::find_current_table(const char *table_name) const
-{
-  if (!table_map_.contains(table_name)) {
-    return nullptr;
-  }
-  Table* target = table_map_.at(table_name);
-  for (auto table: current_query_tables_) {
-    if (table == target) {
-      return table;
-    }
-  }
-  return nullptr;
-}
-
-Table *BinderContext::find_outer_table(const char *table_name) const
-{
-  if (!table_map_.contains(table_name)) {
-    return nullptr;
-  }
-  Table* target = table_map_.at(table_name);
-  for (auto table: outer_query_tables_) {
-    if (table == target) {
-      return table;
-    }
-  }
-  return nullptr;
-}   
-
 ////////////////////////////////////////////////////////////////////////////////
-static void wildcard_fields(Table *table, vector<unique_ptr<Expression>> &expressions, int table_cnt)
+/* static void wildcard_fields(Table *table, vector<unique_ptr<Expression>> &expressions, int table_cnt)
+ * {
+ *   const TableMeta &table_meta = table->table_meta();
+ *   const int        field_num  = table_meta.field_num();
+ * 
+ *   // 通配符会扩展为所有**可见**的field
+ *   for (int i = table_meta.unvisible_field_num(); i < field_num; i++) {
+ *     Field           field(table, table_meta.field(i));
+ *     TableFieldExpr *field_expr = new TableFieldExpr(field);
+ * 
+ *     string expr_name;
+ *     if (table_cnt > 1) {
+ *       expr_name = field.table_name();
+ *       expr_name.push_back('.');
+ *       expr_name.append(field.field_name());
+ *     } else {
+ *       expr_name = field.field_name();
+ *     }
+ *     field_expr->set_name(expr_name);
+ *     expressions.emplace_back(field_expr);
+ *   }
+ * } */
+static void wildcard_fields(const DataSource &ds, vector<unique_ptr<Expression>> &expressions, int ds_cnt)
 {
-  const TableMeta &table_meta = table->table_meta();
-  const int        field_num  = table_meta.field_num();
+  if (ds.table()) {
+    Table           *table      = ds.table();
+    const TableMeta &table_meta = table->table_meta();
+    const int        field_num  = table_meta.field_num();
 
-  // 通配符会扩展为所有**可见**的field
-  for (int i = table_meta.unvisible_field_num(); i < field_num; i++) {
-    Field      field(table, table_meta.field(i));
-    TableFieldExpr *field_expr = new TableFieldExpr(field);
+    // 通配符会扩展为所有**可见**的field
+    for (int i = table_meta.unvisible_field_num(); i < field_num; i++) {
+      Field           field(table, table_meta.field(i));
+      TableFieldExpr *field_expr = new TableFieldExpr(field);
 
-    string expr_name;
-    if (table_cnt > 1) {
-      expr_name = field.table_name();
-      expr_name.push_back('.');
-      expr_name.append(field.field_name());
-    } else {
-      expr_name = field.field_name();
+      string expr_name;
+      if (ds_cnt > 1) {
+        expr_name = field.table_name();
+        expr_name.push_back('.');
+        expr_name.append(field.field_name());
+      } else {
+        expr_name = field.field_name();
+      }
+      field_expr->set_name(expr_name);
+      expressions.emplace_back(field_expr);
     }
-    field_expr->set_name(expr_name);
-    expressions.emplace_back(field_expr);
+  } else {
+    View       *view        = ds.view();
+    const auto &field_metas = view->field_metas();
+    for (const auto &field_meta : field_metas) {
+      ViewFieldExpr *view_field_expr = new ViewFieldExpr(view->name(), field_meta);
+
+      string expr_name;
+      if (ds_cnt > 1) {
+        expr_name = view->name();
+        expr_name.push_back('.');
+        expr_name.append(field_meta.name());
+      } else {
+        expr_name = field_meta.name();
+      }
+      view_field_expr->set_name(expr_name);
+      expressions.emplace_back(view_field_expr);
+    }
   }
 }
 
@@ -141,28 +156,90 @@ RC ExpressionBinder::bind_star_expression(
 
   auto star_expr = static_cast<StarExpr *>(expr.get());
 
-  vector<Table *> tables_to_wildcard;
+  // vector<Table *> tables_to_wildcard;
+  vector<DataSource> ds_to_wildcard;
 
-  const char *table_name = star_expr->table_name();
-  if (!is_blank(table_name) && 0 != strcmp(table_name, "*")) {
-    Table *table = context_.find_current_table(table_name);
-    if (nullptr == table) {
-      LOG_INFO("no such table in from list: %s", table_name);
+  const char *ds_name = star_expr->table_name();
+  if (!is_blank(ds_name) && 0 != strcmp(ds_name, "*")) {
+    auto ds = context_.find_current_data_source(ds_name);
+    if (!ds.is_valid()) {
+      LOG_INFO("no such table in from list: %s", ds_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
 
-    tables_to_wildcard.push_back(table);
+    // tables_to_wildcard.push_back(table);
+    ds_to_wildcard.emplace_back(ds);
   } else {
-    const vector<Table *> &all_tables = context_.current_query_tables();
-    tables_to_wildcard.insert(tables_to_wildcard.end(), all_tables.begin(), all_tables.end());
+    const vector<DataSource> &all_ds = context_.current_data_sources();
+    ds_to_wildcard.insert(ds_to_wildcard.end(), all_ds.begin(), all_ds.end());
+    /* const vector<Table *> &all_tables = context_.current_query_tables();
+     * tables_to_wildcard.insert(tables_to_wildcard.end(), all_tables.begin(), all_tables.end()); */
   }
 
-  for (Table *table : tables_to_wildcard) {
-    wildcard_fields(table, bound_expressions, context_.current_query_tables().size());
+  /* for (Table *table : tables_to_wildcard) {
+   *   wildcard_fields(table, bound_expressions, context_.current_query_tables().size());
+   * } */
+  for (const auto &ds : ds_to_wildcard) {
+    wildcard_fields(ds, bound_expressions, context_.current_data_sources().size());
   }
 
   return RC::SUCCESS;
 }
+
+/* RC ExpressionBinder::bind_unbound_field_expression(
+ *     unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions)
+ * {
+ *   if (nullptr == expr) {
+ *     return RC::SUCCESS;
+ *   }
+ *
+ *   auto unbound_field_expr = static_cast<UnboundFieldExpr *>(expr.get());
+ *
+ *   const char *table_name = unbound_field_expr->table_name();
+ *   const char *field_name = unbound_field_expr->field_name();
+ *
+ *   Table *table = nullptr;
+ *   if (is_blank(table_name)) {
+ *     if (context_.current_data_sources().size() != 1) {
+ *       LOG_INFO("cannot determine table for field: %s", field_name);
+ *       return RC::SCHEMA_TABLE_NOT_EXIST;
+ *     }
+ *
+ *     table = context_.current_data_sources()[0];
+ *   } else {
+ *     table = context_.find_current_data_source(table_name);
+ *     if (nullptr == table) {
+ *       table = context_.find_outer_data_source(table_name);
+ *       if (nullptr == table) {
+ *         LOG_INFO("no such table in BinderContext: %s", table_name);
+ *         return RC::SCHEMA_TABLE_NOT_EXIST;
+ *       }
+ *       context_.add_used_outer_data_source(table);
+ *     }
+ *   }
+ *
+ *   if (0 == strcmp(field_name, "*")) {
+ *     wildcard_fields(table, bound_expressions, context_.current_data_sources().size());
+ *   } else {
+ *     const FieldMeta *field_meta = table->table_meta().field(field_name);
+ *     if (nullptr == field_meta) {
+ *       LOG_INFO("no such field in table: %s.%s", table_name, field_name);
+ *       return RC::SCHEMA_FIELD_MISSING;
+ *     }
+ *
+ *     Field           field(table, field_meta);
+ *     TableFieldExpr *field_expr = new TableFieldExpr(field);
+ *
+ *     if (!unbound_field_expr->alias_name().empty()) {
+ *       field_expr->set_name(unbound_field_expr->alias_name());
+ *     } else {
+ *       field_expr->set_name(field_name);
+ *     }
+ *     bound_expressions.emplace_back(field_expr);
+ *   }
+ *
+ *   return RC::SUCCESS;
+ * } */
 
 RC ExpressionBinder::bind_unbound_field_expression(
     unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions)
@@ -173,54 +250,65 @@ RC ExpressionBinder::bind_unbound_field_expression(
 
   auto unbound_field_expr = static_cast<UnboundFieldExpr *>(expr.get());
 
-  const char *table_name = unbound_field_expr->table_name();
+  const char *ds_name    = unbound_field_expr->table_name();
   const char *field_name = unbound_field_expr->field_name();
 
-  Table *table = nullptr;
-  if (is_blank(table_name)) {
-    if (context_.current_query_tables().size() != 1) {
+  DataSource ds;
+  if (is_blank(ds_name)) {
+    if (context_.current_data_sources().size() != 1) {
       LOG_INFO("cannot determine table for field: %s", field_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
 
-    table = context_.current_query_tables()[0];
+    ds = context_.current_data_sources()[0];
   } else {
-    table = context_.find_current_table(table_name);
-    if (nullptr == table) {
-      table = context_.find_outer_table(table_name);
-      if (nullptr == table) {
-        LOG_INFO("no such table in BinderContext: %s", table_name);
+    ds = context_.find_current_data_source(ds_name);
+    if (!ds.is_valid()) {
+      ds = context_.find_outer_data_source(ds_name);
+      if (!ds.is_valid()) {
+        LOG_INFO("no such table in BinderContext: %s", ds_name);
         return RC::SCHEMA_TABLE_NOT_EXIST;
       }
-      context_.add_used_outer_table(table);
+      context_.add_used_outer_data_source(ds);
     }
   }
 
   if (0 == strcmp(field_name, "*")) {
-    wildcard_fields(table, bound_expressions, context_.current_query_tables().size());
+    wildcard_fields(ds, bound_expressions, context_.current_data_sources().size());
   } else {
-    const FieldMeta *field_meta = table->table_meta().field(field_name);
-    if (nullptr == field_meta) {
-      LOG_INFO("no such field in table: %s.%s", table_name, field_name);
-      return RC::SCHEMA_FIELD_MISSING;
-    }
+    if (ds.table() != nullptr) {
+      Table *table = ds.table();
+      const FieldMeta *field_meta = table->table_meta().field(field_name);
+      if (nullptr == field_meta) {
+        LOG_INFO("no such field in table: %s.%s", ds_name, field_name);
+        return RC::SCHEMA_FIELD_MISSING;
+      }
 
-    Field      field(table, field_meta);
-    TableFieldExpr *field_expr = new TableFieldExpr(field);
+      Field           field(table, field_meta);
+      TableFieldExpr *field_expr = new TableFieldExpr(field);
 
-    if (!unbound_field_expr->alias_name().empty()) {
-      field_expr->set_name(unbound_field_expr->alias_name());
+      if (!unbound_field_expr->alias_name().empty()) {
+        field_expr->set_name(unbound_field_expr->alias_name());
+      } else {
+        field_expr->set_name(field_name);
+      }
+      bound_expressions.emplace_back(field_expr);
     }
     else {
-      // 如果一个查询中涉及到2个或以上表，schema中需要给出表名
-      field_expr->set_name(field_name);
-      /* if (context_.current_query_tables().size() > 1) {
-       *   field_expr->set_name(unbound_field_expr->name());
-       * } else {
-       *   field_expr->set_name(field_name);
-       * } */
+      View *view = ds.view();
+      const ViewFieldMeta *field_meta = view->field_meta(field_name);
+      if (nullptr == field_meta) {
+        LOG_INFO("no such field in view: %s.%s", ds_name, field_name);
+        return RC::SCHEMA_FIELD_MISSING;
+      }
+      ViewFieldExpr *view_field_expr = new ViewFieldExpr(view->name(), *field_meta);
+      if (!unbound_field_expr->alias_name().empty()) {
+        view_field_expr->set_name(unbound_field_expr->alias_name());
+      } else {
+        view_field_expr->set_name(field_name);
+      }
+      bound_expressions.emplace_back(view_field_expr);
     }
-    bound_expressions.emplace_back(field_expr);
   }
 
   return RC::SUCCESS;
@@ -517,8 +605,7 @@ RC ExpressionBinder::bind_aggregate_expression(
   auto aggregate_expr = make_unique<AggregateExpr>(aggregate_type, std::move(child_expr));
   if (!unbound_aggregate_expr->alias_name().empty()) {
     aggregate_expr->set_name(unbound_aggregate_expr->alias_name());
-  }
-  else {
+  } else {
     aggregate_expr->set_name(unbound_aggregate_expr->name());
   }
   rc = check_aggregate_expression(*aggregate_expr);

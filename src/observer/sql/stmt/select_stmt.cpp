@@ -223,18 +223,13 @@ auto SelectStmt::collect_tables(
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
 
-    // table_map.insert({table_name, table});
-    binder_context.add_current_table(table);
+    binder_context.add_current_data_source(table);
     if (!single_table->alias_name.empty()) {
       const char* alias_name = single_table->alias_name.c_str();
-      if (binder_context.find_current_table(alias_name)) {
+      if (binder_context.find_current_data_source(alias_name)) {
         return RC::INVALID_ARGUMENT;
       }
-      /* if (table_map.contains(alias_name)) {
-       *   return RC::INVALID_ARGUMENT;
-       * }
-       * table_map.insert({alias_name, table}); */
-      binder_context.add_current_table(alias_name, table);
+      binder_context.add_current_data_source(alias_name, table);
     }
     
     return RC::SUCCESS;
@@ -262,8 +257,9 @@ RC SelectStmt::bind_tables(const BinderContext& binder_context, ExpressionBinder
   if (UnboundSingleTable *single_table = dynamic_cast<UnboundSingleTable *>(unbound_table); single_table != nullptr) {
     // single_table->relation_name 一定存在
     // Table *table = table_map.at(single_table->relation_name);
-    Table *table = binder_context.find_current_table(single_table->relation_name.c_str());
-    bound_table  = make_unique<BoundSingleTable>(table);
+    // Table *table = binder_context.find_current_data_source(single_table->relation_name.c_str());
+    DataSource ds = binder_context.find_current_data_source(single_table->relation_name.c_str());
+    bound_table  = make_unique<BoundSingleTable>(ds);
     return RC::SUCCESS;
   }
 

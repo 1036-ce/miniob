@@ -9,6 +9,8 @@
 const static Json::StaticString VIEW_FIELD_NAME("name");
 const static Json::StaticString VIEW_FIELD_ORIGINAL_TABLE_NAME("original_table_name");
 const static Json::StaticString VIEW_FIELD_ORIGINAL_FIELD_NAME("original_field_name");
+const static Json::StaticString VIEW_FIELD_TYPE("type");
+const static Json::StaticString VIEW_FIELD_LENGTH("length");
 
 const static Json::StaticString VIEW_NAME("name");
 const static Json::StaticString VIEW_SELECT_SQL("select_sql");
@@ -19,6 +21,8 @@ void ViewFieldMeta::to_json(Json::Value &json_value) const
   json_value[VIEW_FIELD_NAME]                = name_;
   json_value[VIEW_FIELD_ORIGINAL_TABLE_NAME] = original_table_name_;
   json_value[VIEW_FIELD_ORIGINAL_FIELD_NAME] = original_field_name_;
+  json_value[VIEW_FIELD_TYPE]                = attr_type_to_string(type_);
+  json_value[VIEW_FIELD_LENGTH]              = length_;
 }
 
 RC ViewFieldMeta::from_json(const Json::Value &json_value, ViewFieldMeta &field)
@@ -31,6 +35,8 @@ RC ViewFieldMeta::from_json(const Json::Value &json_value, ViewFieldMeta &field)
   const Json::Value &name_value                = json_value[VIEW_FIELD_NAME];
   const Json::Value &original_table_name_value = json_value[VIEW_FIELD_ORIGINAL_TABLE_NAME];
   const Json::Value &original_field_name_value = json_value[VIEW_FIELD_ORIGINAL_FIELD_NAME];
+  const Json::Value &type_value                = json_value[VIEW_FIELD_TYPE];
+  const Json::Value &length_value              = json_value[VIEW_FIELD_LENGTH];
 
   if (!name_value.isString()) {
     LOG_ERROR("Field name is not a string. json value=%s", name_value.toStyledString().c_str());
@@ -44,11 +50,21 @@ RC ViewFieldMeta::from_json(const Json::Value &json_value, ViewFieldMeta &field)
     LOG_ERROR("original_field_name is not a string. json value=%s", original_field_name_value.toStyledString().c_str());
     return RC::INTERNAL;
   }
+  if (!type_value.isString()) {
+    LOG_ERROR("Field type is not a string. json value=%s", type_value.toStyledString().c_str());
+    return RC::INTERNAL;
+  }
+  if (!length_value.isInt()) {
+    LOG_ERROR("Length is not an integer. json value=%s", length_value.toStyledString().c_str());
+    return RC::INTERNAL;
+  }
 
-  string name                = name_value.asString();
-  string original_table_name = original_table_name_value.asString();
-  string original_field_name = original_field_name_value.asString();
-  return field.init(name, original_table_name, original_field_name);
+  string   name                = name_value.asString();
+  string   original_table_name = original_table_name_value.asString();
+  string   original_field_name = original_field_name_value.asString();
+  AttrType type                = attr_type_from_string(type_value.asCString());
+  int      length              = length_value.asInt();
+  return field.init(name, original_table_name, original_field_name, type, length);
 }
 
 RC View::create(Db *db, const char *path, const char *name, const char *base_dir, const string &select_sql)
@@ -100,8 +116,8 @@ RC View::create(Db *db, const char *path, const char *name, const char *base_dir
 
 RC View::open(Db *db, const char *name, const char *base_dir)
 {
-  RC      rc   = RC::SUCCESS;
-  string  view_file_path = string(base_dir) + common::FILE_PATH_SPLIT_STR + name;
+  RC     rc             = RC::SUCCESS;
+  string view_file_path = string(base_dir) + common::FILE_PATH_SPLIT_STR + name;
 
   fstream fs;
   fs.open(view_file_path, ios_base::in | ios_base::binary);
@@ -210,6 +226,16 @@ int View::deserialize(istream &is)
 int View::get_serial_size() const { return -1; }
 
 void View::to_string(string &output) const {}
+
+const ViewFieldMeta *View::field_meta(const string &name) const
+{
+  for (const auto &field_meta : field_metas_) {
+    if (field_meta.name() == name) {
+      return &field_meta;
+    }
+  }
+  return nullptr;
+}
 
 RC View::create_select_stmt(Db *db, const string &select_sql, unique_ptr<SelectStmt> &select_stmt)
 {

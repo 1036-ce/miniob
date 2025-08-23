@@ -62,7 +62,7 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
 
   BinderContext binder_context;
   binder_context.set_db(db);
-  binder_context.add_current_table(table);
+  binder_context.add_current_data_source(table);
   vector<unique_ptr<Expression>> target_expressions;
   ExpressionBinder expression_binder(binder_context);
 

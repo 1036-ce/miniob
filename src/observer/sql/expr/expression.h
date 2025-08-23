@@ -41,7 +41,8 @@ enum class ExprType
   UNBOUND_FIELD,        ///< 未绑定的字段，需要在resolver阶段解析为FieldExpr
   UNBOUND_AGGREGATION,  ///< 未绑定的聚合函数，需要在resolver阶段解析为AggregateExpr
 
-  TABLE_FIELD,        ///< 字段。在实际执行时，根据行数据内容提取对应字段的值
+  TABLE_FIELD,  ///< 字段。在实际执行时，根据行数据内容提取对应字段的值
+  VIEW_FIELD,
   VALUE,        ///< 常量值
   CAST,         ///< 需要做类型转换的表达式
   COMPARISON,   ///< 需要做比较的表达式
@@ -601,11 +602,12 @@ public:
   ExprType type() const override { return ExprType::AGGREGATION; }
 
   AttrType value_type() const override { return child_->value_type(); }
-  int      value_length() const override { 
+  int      value_length() const override
+  {
     if (aggregate_type_ == AggregateExpr::Type::COUNT) {
       return 4;
     }
-    return child_->value_length(); 
+    return child_->value_length();
   }
 
   RC get_value(const Tuple &tuple, Value &value) const override;
