@@ -46,23 +46,32 @@ public:
   {
     table_map_.insert({table->name(), table});
     if (!unique_tables_.contains(table)) {
-      current_query_tables_.push_back(table);
       unique_tables_.insert(table);
     }
+
+    for (auto cur_table: current_query_tables_) {
+      if (cur_table == table) {
+        return;
+      }
+    }
+    current_query_tables_.push_back(table);
   }
   void add_outer_table(Table *table) { outer_query_tables_.push_back(table); }
   void add_used_outer_table(Table *table) { used_outer_tables_.push_back(table); }
 
   void add_current_table(const string &alias_name, Table *table)
   {
-    /* current_query_tables_.push_back(table);
-     * table_map_.insert({alias_name, table});
-     * unique_tables_.insert(table); */
     table_map_.insert({alias_name, table});
     if (!unique_tables_.contains(table)) {
-      current_query_tables_.push_back(table);
       unique_tables_.insert(table);
     }
+
+    for (auto cur_table: current_query_tables_) {
+      if (cur_table == table) {
+        return;
+      }
+    }
+    current_query_tables_.push_back(table);
   }
 
   void clear_current_table()
@@ -72,7 +81,7 @@ public:
   }
   void clear_outer_table() { outer_query_tables_.clear(); }
 
-  Table *find_table(const char *table_name) const;
+  Table *find_current_table(const char *table_name) const;
   Table *find_outer_table(const char *table_name) const;
 
   const vector<Table *> &current_query_tables() const { return current_query_tables_; }

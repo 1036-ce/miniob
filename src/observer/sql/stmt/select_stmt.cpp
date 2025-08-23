@@ -96,14 +96,8 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     orderby_expressions.clear();
   }
 
-  /* Table *default_table = nullptr;
-   * if (table_map.size() == 1) {
-   *   default_table = table_map.begin()->second;
-   * } */
-
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
-  // rc = FilterStmt::create(db, default_table, &table_map, std::move(select_sql.condition), filter_stmt);
   rc = FilterStmt::create(db, binder_context, std::move(select_sql.condition), filter_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");
@@ -113,8 +107,6 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   // create filter statement in 'having' statement
   FilterStmt *having_filter_stmt = nullptr;
   if (select_sql.group_by) {
-    /* rc = FilterStmt::create(
-     *     db, default_table, &table_map, std::move(select_sql.group_by->having_predicate), having_filter_stmt); */
     rc = FilterStmt::create(db, binder_context, std::move(select_sql.group_by->having_predicate), having_filter_stmt);
     if (rc != RC::SUCCESS) {
       LOG_WARN("cannot construct filter stmt");

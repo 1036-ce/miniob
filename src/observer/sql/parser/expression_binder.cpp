@@ -21,7 +21,7 @@ See the Mulan PSL v2 for more details. */
 
 using namespace common;
 
-Table *BinderContext::find_table(const char *table_name) const
+Table *BinderContext::find_current_table(const char *table_name) const
 {
   if (!table_map_.contains(table_name)) {
     return nullptr;
@@ -145,7 +145,7 @@ RC ExpressionBinder::bind_star_expression(
 
   const char *table_name = star_expr->table_name();
   if (!is_blank(table_name) && 0 != strcmp(table_name, "*")) {
-    Table *table = context_.find_table(table_name);
+    Table *table = context_.find_current_table(table_name);
     if (nullptr == table) {
       LOG_INFO("no such table in from list: %s", table_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
@@ -185,7 +185,7 @@ RC ExpressionBinder::bind_unbound_field_expression(
 
     table = context_.current_query_tables()[0];
   } else {
-    table = context_.find_table(table_name);
+    table = context_.find_current_table(table_name);
     if (nullptr == table) {
       table = context_.find_outer_table(table_name);
       if (nullptr == table) {
