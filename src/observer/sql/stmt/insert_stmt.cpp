@@ -65,8 +65,7 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
       }
     }
     if (index == view_field_metas.size()) {
-      Value tmp;
-      tmp.set_type(table_field_meta.type());
+      Value tmp = Value::default_value(table_field_meta.type());
       tmp.set_null(true);
       values.push_back(tmp);
     }

@@ -148,6 +148,27 @@ public:
     return DataType::type_instance(value.attr_type())->cast_to(value, to_type, result);
   }
 
+  static Value default_value(AttrType type)
+  {
+    switch (type) {
+      case AttrType::INTS: {
+        return default_integer();
+      }
+      case AttrType::FLOATS: {
+        return default_float();
+      }
+      case AttrType::CHARS: {
+        return default_char();
+      }
+      case AttrType::DATES: {
+        return default_date();
+      }
+      case AttrType::BITMAP: {
+        return default_bitmap();
+      }
+      default: return default_integer();
+    }
+  }
   static Value default_integer() { return Value(static_cast<int>(0)); }
   static Value default_float() { return Value(static_cast<float>(0)); }
   static Value default_date()
