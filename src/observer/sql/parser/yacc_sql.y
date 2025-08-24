@@ -115,8 +115,6 @@ SubQueryExpr *create_subquery_expression(const vector<Value>& value_list) {
         SET
         ON
         LOAD
-        DATA
-        INFILE
         EXPLAIN
         STORAGE
         FORMAT
@@ -226,7 +224,6 @@ SubQueryExpr *create_subquery_expression(const vector<Value>& value_list) {
 %type <sql_node>            begin_stmt
 %type <sql_node>            commit_stmt
 %type <sql_node>            rollback_stmt
-%type <sql_node>            load_data_stmt
 %type <sql_node>            explain_stmt
 %type <sql_node>            set_variable_stmt
 %type <sql_node>            help_stmt
@@ -266,7 +263,6 @@ command_wrapper:
   | begin_stmt
   | commit_stmt
   | rollback_stmt
-  | load_data_stmt
   | explain_stmt
   | set_variable_stmt
   | help_stmt
@@ -982,17 +978,6 @@ order_by:
     }
     | ORDER_T BY order_by_list {
       $$ = $3;
-    }
-    ;
-load_data_stmt:
-    LOAD DATA INFILE SSS INTO TABLE ID 
-    {
-      char *tmp_file_name = common::substr($4, 1, strlen($4) - 2);
-      
-      $$ = new ParsedSqlNode(SCF_LOAD_DATA);
-      $$->load_data.relation_name = $7;
-      $$->load_data.file_name = tmp_file_name;
-      free(tmp_file_name);
     }
     ;
 
