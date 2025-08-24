@@ -18,29 +18,112 @@ See the Mulan PSL v2 for more details. */
 #include "storage/db/db.h"
 #include "storage/table/table.h"
 
-InsertStmt::InsertStmt(Table *table, const Value *values, int value_amount)
-    : table_(table), values_(values), value_amount_(value_amount)
-{}
+/* InsertStmt::InsertStmt(Table *table, const Value *values, int value_amount)
+ *     : table_(table), values_(values), value_amount_(value_amount)
+ * {} */
+InsertStmt::InsertStmt(Table *table, const vector<Value>& values): table_(table), values_(values) {}
 
 RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
 {
-  const char *table_name = inserts.relation_name.c_str();
-  if (nullptr == db || nullptr == table_name || inserts.values.empty()) {
+  const char *relation_name = inserts.relation_name.c_str();
+  if (nullptr == db || nullptr == relation_name || inserts.values.empty()) {
     LOG_WARN("invalid argument. db=%p, table_name=%p, value_num=%d",
-        db, table_name, static_cast<int>(inserts.values.size()));
+        db, relation_name, static_cast<int>(inserts.values.size()));
     return RC::INVALID_ARGUMENT;
   }
 
-  // check whether the table exists
-  Table *table = db->find_table(table_name);
-  if (nullptr == table) {
-    LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
-    return RC::SCHEMA_TABLE_NOT_EXIST;
+  Table *table = db->find_table(relation_name);
+  if (table != nullptr) {
+    return InsertStmt::create(table, inserts.values, stmt);
   }
 
+  View *view = db->find_view(relation_name);
+  if (view == nullptr) {
+    LOG_WARN("no such relation. db=%s, relation_name=%s", db->name(), relation_name);
+    return RC::INTERNAL;
+  }
+
+  if (!view->insertable()) {
+    LOG_WARN("view %s is not insertable", relation_name);
+    return RC::INTERNAL;
+  }
+
+  const auto& view_field_metas = view->field_metas();
+  string table_name = view_field_metas.begin()->original_table_name();
+  table = db->find_table(table_name.c_str());
+  ASSERT(table != nullptr, "view's table must not be nullptr");
+  const TableMeta& table_meta = table->table_meta();
+
+  std::vector<Value> values;
+  for (int i = table_meta.unvisible_field_num(); i < table_meta.field_num(); ++i) {
+    const FieldMeta& table_field_meta = *table_meta.field(i);
+    size_t index = 0;
+    for (; index < view_field_metas.size(); ++index) {
+      const auto& view_field_meta = view_field_metas.at(index);
+      if (string{table_field_meta.name()} == view_field_meta.original_field_name()) {
+        break;
+      }
+    }
+    if (index == view_field_metas.size()) {
+      Value tmp;
+      tmp.set_type(table_field_meta.type());
+      tmp.set_null(true);
+      values.push_back(tmp);
+    }
+    else {
+      values.push_back(inserts.values.at(index));
+    }
+  }
+
+  return InsertStmt::create(table, values, stmt);
+
+  /* // check whether the table exists
+   * Table *table = db->find_table(table_name);
+   * if (nullptr == table) {
+   *   LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+   *   return RC::SCHEMA_TABLE_NOT_EXIST;
+   * } */
+
+/*   // check the fields number
+ *   const Value     *values     = inserts.values.data();
+ *   const int        value_num  = static_cast<int>(inserts.values.size());
+ *   const TableMeta &table_meta = table->table_meta();
+ *   const int        visible_field_num  = table_meta.visible_field_num();
+ *   if (visible_field_num != value_num) {
+ *     LOG_WARN("schema mismatch. value num=%d, field num in schema=%d", value_num, visible_field_num);
+ *     return RC::SCHEMA_FIELD_MISSING;
+ *   } 
+ * 
+ *   // check whether value can be null
+ *   const int unvisible_field_num = table_meta.unvisible_field_num();
+ *   for (int i = unvisible_field_num; i < table_meta.field_num(); ++i) {
+ *     const FieldMeta *field_meta = table_meta.field(i);
+ *     if (!field_meta->nullable() && values[i - unvisible_field_num].is_null()) {
+ *       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+ *     }
+ *   }
+ * 
+ *   // check text length
+ *   for (int i = unvisible_field_num; i < table_meta.field_num(); ++i) {
+ *     const AttrType field_type = table_meta.field(i)->type();
+ *     const Value& value = values[i - unvisible_field_num];
+ *     if (field_type == AttrType::TEXT && value.attr_type() == AttrType::CHARS) {
+ *       if (value.length() > TEXT_MAX_SIZE) {
+ *         LOG_WARN("This string is too long");
+ *         return RC::INVALID_ARGUMENT;
+ *       }
+ *     }
+ *   }
+ * 
+ *   // everything alright
+ *   // stmt = new InsertStmt(table, values, value_num);
+ *   stmt = new InsertStmt(table, inserts.values);
+ *   return RC::SUCCESS; */
+}
+
+RC InsertStmt::create(Table* table, const vector<Value>& values, Stmt *&stmt) {
   // check the fields number
-  const Value     *values     = inserts.values.data();
-  const int        value_num  = static_cast<int>(inserts.values.size());
+  const int        value_num  = static_cast<int>(values.size());
   const TableMeta &table_meta = table->table_meta();
   const int        visible_field_num  = table_meta.visible_field_num();
   if (visible_field_num != value_num) {
@@ -70,6 +153,7 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
   }
 
   // everything alright
-  stmt = new InsertStmt(table, values, value_num);
+  stmt = new InsertStmt(table, values);
   return RC::SUCCESS;
 }
+

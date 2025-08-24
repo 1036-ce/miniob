@@ -39,7 +39,12 @@ RC ViewProjectPhysicalOperator::next()
   return children_[0]->next();
 }
 
-RC ViewProjectPhysicalOperator::close() { return RC::SUCCESS; }
+RC ViewProjectPhysicalOperator::close() { 
+  if (!children_.empty()) {
+    children_[0]->close();
+  }
+  return RC::SUCCESS; 
+}
 
 Tuple *ViewProjectPhysicalOperator::current_tuple()
 {

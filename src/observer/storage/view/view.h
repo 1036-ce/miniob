@@ -77,6 +77,7 @@ public:
    * RC gen_logical_plan();
    * RC gen_physical_plan(); */
   RC gen_physical_plan(Session *session, unique_ptr<PhysicalOperator> &oper);
+  bool insertable();
 
   const string                &name() const { return name_; }
   const string                &select_sql() const { return select_sql_; }

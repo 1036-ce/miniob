@@ -274,6 +274,16 @@ RC View::gen_physical_plan(Session *session, unique_ptr<PhysicalOperator> &oper)
   return rc;
 }
 
+
+bool View::insertable() {
+  for (const auto& field_meta: field_metas_) {
+    if (field_meta.original_field_name().empty()) {
+      return false;
+    }
+  }
+  return true;
+}
+
 RC View::create_select_stmt(Db *db, const string &select_sql, unique_ptr<SelectStmt> &select_stmt)
 {
   RC              rc = RC::SUCCESS;

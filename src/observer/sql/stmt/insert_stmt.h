@@ -28,7 +28,8 @@ class InsertStmt : public Stmt
 {
 public:
   InsertStmt() = default;
-  InsertStmt(Table *table, const Value *values, int value_amount);
+  // InsertStmt(Table *table, const Value *values, int value_amount);
+  InsertStmt(Table *table, const vector<Value> &values);
 
   StmtType type() const override { return StmtType::INSERT; }
 
@@ -36,12 +37,17 @@ public:
   static RC create(Db *db, const InsertSqlNode &insert_sql, Stmt *&stmt);
 
 public:
-  Table       *table() const { return table_; }
-  const Value *values() const { return values_; }
-  int          value_amount() const { return value_amount_; }
+  Table *table() const { return table_; }
+  // const Value *values() const { return values_; }
+  // int          value_amount() const { return value_amount_; }
+  const Value *values() const { return values_.data(); }
+  int          value_amount() const { return values_.size(); }
 
 private:
-  Table       *table_        = nullptr;
-  const Value *values_       = nullptr;
-  int          value_amount_ = 0;
+  static RC create(Table *table, const vector<Value> &values, Stmt *&stmt);
+
+  Table *table_ = nullptr;
+  // const Value *values_       = nullptr;
+  vector<Value> values_;
+  // int          value_amount_ = 0;
 };
