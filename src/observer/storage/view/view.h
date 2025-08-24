@@ -44,6 +44,8 @@ public:
     return RC::SUCCESS;
   }
 
+  bool updatable() const { return !original_field_name_.empty(); }
+
   const string &name() const { return name_; }
   const string &original_table_name() const { return original_table_name_; }
   const string &original_field_name() const { return original_field_name_; }

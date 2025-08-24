@@ -44,6 +44,7 @@ public:
   vector<unique_ptr<Expression>> &target_expressions() { return target_expressions_; }
 
 private:
+  static RC create(Db* db, Table *table, vector<unique_ptr<Assignment>> assignment_list, unique_ptr<Expression> condition, Stmt *&stmt);
   Table                         *table_       = nullptr;
   FilterStmt                    *filter_stmt_ = nullptr;
   vector<unique_ptr<Expression>> target_expressions_;
