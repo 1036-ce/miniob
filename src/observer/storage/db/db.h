@@ -79,6 +79,14 @@ public:
   RC create_view(const string& view_name, const string& select_sql);
 
   /**
+   * @brief 创建一个视图
+   * @param view_name 视图名
+   * @param attr_names 属性名
+   * @param select_sql select_sql字符串
+   */
+  RC create_view(const string& view_name, const vector<string>& attr_names, const string& select_sql);
+
+  /**
    * @brief 根据名查找视图
    */
   View *find_view(const char *view_name) const;

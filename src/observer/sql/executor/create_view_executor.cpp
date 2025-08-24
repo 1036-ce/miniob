@@ -20,9 +20,15 @@ RC CreateViewExecutor::execute(SQLStageEvent *sql_event)
 
   CreateViewStmt *create_view_stmt = static_cast<CreateViewStmt *>(stmt);
   LOG_DEBUG("view's name: %s, view's select_sql: %s", create_view_stmt->view_name().c_str(), create_view_stmt->select_sql().c_str());
-  if (OB_FAIL(rc = db->create_view(create_view_stmt->view_name(), create_view_stmt->select_sql()))) {
-    return rc;
+  if (create_view_stmt->attr_names().empty()) {
+    if (OB_FAIL(rc = db->create_view(create_view_stmt->view_name(), create_view_stmt->select_sql()))) {
+      return rc;
+    }
+  } else {
+    if (OB_FAIL(rc = db->create_view(
+                    create_view_stmt->view_name(), create_view_stmt->attr_names(), create_view_stmt->select_sql()))) {
+      return rc;
+    }
   }
-  return rc; 
+  return rc;
 }
-

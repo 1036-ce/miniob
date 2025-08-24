@@ -93,29 +93,34 @@ enum JoinType
   INNER
 };
 
-struct UnboundTable {
+struct UnboundTable
+{
   virtual ~UnboundTable() = default;
 };
 
-struct UnboundSingleTable : public UnboundTable {
+struct UnboundSingleTable : public UnboundTable
+{
   string relation_name;
   string alias_name;
 };
 
-struct UnboundJoinedTable : public UnboundTable {
-  JoinType type;
-  unique_ptr<Expression> expr;
+struct UnboundJoinedTable : public UnboundTable
+{
+  JoinType                 type;
+  unique_ptr<Expression>   expr;
   unique_ptr<UnboundTable> left;
   unique_ptr<UnboundTable> right;
 };
 
-struct GroupBy {
+struct GroupBy
+{
   vector<unique_ptr<Expression>> exprs;
-  unique_ptr<Expression> having_predicate;
+  unique_ptr<Expression>         having_predicate;
 };
 
-struct OrderBy {
-  bool is_asc;
+struct OrderBy
+{
+  bool                   is_asc;
   unique_ptr<Expression> expr;
 };
 
@@ -135,9 +140,9 @@ struct SelectSqlNode
   vector<unique_ptr<Expression>> expressions;  ///< 查询的表达式
   unique_ptr<UnboundTable>       table_refs;
   // vector<unique_ptr<Expression>> group_by;     ///< group by clause
-  unique_ptr<GroupBy>            group_by;
-  unique_ptr<Expression>         condition;    ///< 查询条件
-  vector<unique_ptr<OrderBy>>    order_by;
+  unique_ptr<GroupBy>         group_by;
+  unique_ptr<Expression>      condition;  ///< 查询条件
+  vector<unique_ptr<OrderBy>> order_by;
 };
 
 /**
@@ -166,9 +171,9 @@ struct InsertSqlNode
  */
 struct DeleteSqlNode
 {
-  string                   relation_name;  ///< Relation to delete from
+  string relation_name;  ///< Relation to delete from
   // vector<ConditionSqlNode> conditions;
-  unique_ptr<Expression>   condition;
+  unique_ptr<Expression> condition;
 };
 
 /**
@@ -190,7 +195,7 @@ struct UpdateSqlNode
   string                              relation_name;    ///< Relation to update
   std::vector<unique_ptr<Assignment>> assignment_list;  ///< 更新的列表
   // vector<ConditionSqlNode>            conditions;       ///< 更新的条件
-  unique_ptr<Expression>              condition;
+  unique_ptr<Expression> condition;
   /* string                   attribute_name;  ///< 更新的字段，仅支持一个字段
    * Value                    value;           ///< 更新的值，仅支持一个字段 */
 };
@@ -213,9 +218,11 @@ struct AttrInfoSqlNode
  * @ingroup SQLParser
  **/
 
-struct CreateViewSqlNode {
-  string view_name;
-  string select_sql;
+struct CreateViewSqlNode
+{
+  string         view_name;
+  vector<string> attr_names;
+  string         select_sql;
 };
 
 /**
@@ -228,7 +235,7 @@ struct CreateTableSqlNode
   string                  relation_name;  ///< Relation name
   vector<AttrInfoSqlNode> attr_infos;     ///< attributes
   vector<string>          primary_keys;   ///< primary keys
-  SelectSqlNode           *select_sql_node = nullptr;
+  SelectSqlNode          *select_sql_node = nullptr;
   // TODO: integrate to CreateTableOptions
   string storage_format;  ///< storage format
   string storage_engine;  ///< storage engine
@@ -260,11 +267,11 @@ struct AnalyzeTableSqlNode
  */
 struct CreateIndexSqlNode
 {
-  string index_name;      ///< Index name
-  string relation_name;   ///< Relation name
+  string index_name;     ///< Index name
+  string relation_name;  ///< Relation name
   // string attribute_name;  ///< Attribute name
   vector<string> attr_names;
-  bool is_unique;
+  bool           is_unique;
 };
 
 /**

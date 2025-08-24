@@ -218,6 +218,30 @@ RC Db::create_view(const string& view_name, const string& select_sql) {
   return rc;
 }
 
+
+RC Db::create_view(const string& view_name, const vector<string>& attr_names, const string& select_sql) {
+  RC rc = RC::SUCCESS;
+  // check view_name
+  if (opened_views_.count(view_name) != 0) {
+    LOG_WARN("%s has been opened before.", view_name.c_str());
+    return RC::SCHEMA_TABLE_EXIST;
+  }
+
+  string  view_file_path = view_file(path_.c_str(), view_name.c_str());
+  View *view = new View();
+  rc = view->create(this, view_file_path.c_str(), view_name.c_str(), path_.c_str(), select_sql, attr_names);
+  if (OB_FAIL(rc)) {
+    LOG_ERROR("Failed to create view %s.", view_name.c_str());
+    delete view;
+    return rc;
+  }
+
+  opened_views_[view_name] = view;
+  LOG_INFO("Create view success. table name=%s", view_name.c_str());
+  return rc;
+
+}
+
 View *Db::find_view(const char *view_name) const {
   auto iter = opened_views_.find(view_name);
   if (iter != opened_views_.end()) {

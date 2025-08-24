@@ -117,6 +117,60 @@ RC View::create(Db *db, const char *path, const char *name, const char *base_dir
   return rc;
 }
 
+RC View::create(Db *db, const char *path, const char *name, const char *base_dir, const string &select_sql, const vector<string>& attr_names) {
+  RC rc = RC::SUCCESS;
+  // 判断视图文件是否已经存在
+  int fd = ::open(path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
+  if (fd < 0) {
+    if (EEXIST == errno) {
+      LOG_ERROR("Failed to create view file, it has been created. %s, EEXIST, %s", path, strerror(errno));
+      return RC::SCHEMA_TABLE_EXIST;
+    }
+    LOG_ERROR("Create view file failed. filename=%s, errmsg=%d:%s", path, errno, strerror(errno));
+    return RC::IOERR_OPEN;
+  }
+
+  close(fd);
+
+  unique_ptr<SelectStmt> select_stmt = nullptr;
+  if (OB_FAIL(rc = create_select_stmt(db, select_sql, select_stmt))) {
+    return rc;
+  }
+
+  vector<ViewFieldMeta> field_metas;
+  for (const auto &expr : select_stmt->query_expressions()) {
+    field_metas.emplace_back(*expr);
+  }
+
+  db_         = db;
+  name_       = name;
+  select_sql_ = select_sql;
+  field_metas_.swap(field_metas);
+
+  if (attr_names.size() != field_metas_.size()) {
+    return RC::SCHEMA_FIELD_MISSING;
+  }
+  for (size_t i = 0; i < field_metas_.size(); ++i) {
+    ViewFieldMeta& field_meta = field_metas_.at(i);
+    field_meta.set_name(attr_names.at(i));
+  };
+
+  fstream fs;
+  fs.open(path, ios_base::out | ios_base::binary);
+  if (!fs.is_open()) {
+    LOG_ERROR("Failed to open file for write. file name=%s, errmsg=%s", path, strerror(errno));
+    return RC::IOERR_OPEN;
+  }
+  if (serialize(fs) < 0) {
+    LOG_ERROR("Failed to dump view meta to file: %s. sys err=%d:%s", path, errno, strerror(errno));
+    return RC::IOERR_WRITE;
+  }
+  fs.close();
+
+  LOG_INFO("Successfully create view %s:%s", base_dir, name);
+  return RC::SUCCESS;
+}
+
 RC View::open(Db *db, const char *name, const char *base_dir)
 {
   RC     rc             = RC::SUCCESS;

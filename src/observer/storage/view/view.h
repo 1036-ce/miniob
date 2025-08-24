@@ -46,6 +46,7 @@ public:
 
   bool updatable() const { return !original_field_name_.empty(); }
 
+  void set_name(const string& name) { name_ = name; }
   const string &name() const { return name_; }
   const string &original_table_name() const { return original_table_name_; }
   const string &original_field_name() const { return original_field_name_; }
@@ -73,6 +74,7 @@ public:
   virtual ~View() = default;
 
   RC create(Db *db, const char *path, const char *name, const char *base_dir, const string &select_sql);
+  RC create(Db *db, const char *path, const char *name, const char *base_dir, const string &select_sql, const vector<string>& attr_names);
   RC open(Db *db, const char *name, const char *base_dir);
 
   /* RC gen_select_stmt();

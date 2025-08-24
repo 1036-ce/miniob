@@ -365,6 +365,16 @@ create_view_stmt:
       create_view.select_sql = token_name(sql_string, &@5);
       delete $5;
     }
+    | CREATE VIEW ID LBRACE attr_list RBRACE AS_T select_stmt 
+    {
+      $$ = new ParsedSqlNode(SCF_CREATE_VIEW);
+      CreateViewSqlNode &create_view = $$->create_view;
+      create_view.view_name = $3;
+      create_view.attr_names.swap(*$5);
+      delete $5;
+      create_view.select_sql = token_name(sql_string, &@8);
+      delete $8;
+    }
     ;
 create_table_stmt:    /*create table 语句的语法解析树*/
     CREATE TABLE ID LBRACE attr_def attr_def_list primary_key RBRACE select_stmt_opt storage_format
