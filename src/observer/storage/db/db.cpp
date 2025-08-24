@@ -218,6 +218,14 @@ RC Db::create_view(const string& view_name, const string& select_sql) {
   return rc;
 }
 
+View *Db::find_view(const char *view_name) const {
+  auto iter = opened_views_.find(view_name);
+  if (iter != opened_views_.end()) {
+    return iter->second;
+  }
+  return nullptr;
+}
+
 RC Db::drop_table(const char *table_name)
 {
   if (opened_tables_.contains(table_name)) {
@@ -317,7 +325,7 @@ RC Db::open_all_views() {
       return rc;
     }
 
-    opened_views_[filename] = view;
+    opened_views_[view->name()] = view;
     LOG_INFO("Open view: %s", filename.c_str());
   }
 

@@ -72,6 +72,35 @@ void BinderContext::add_used_outer_data_source(View *view) {
   used_outer_data_sources_.emplace_back(view);
 }
 
+
+void BinderContext::add_current_data_source(const DataSource& ds) {
+  data_source_map_.insert({ds.name(), ds});
+  if (!unique_data_sources_.contains(ds)) {
+    unique_data_sources_.insert(ds);
+  }
+
+  for (auto cur_ds : current_data_sources_) {
+    if (cur_ds == ds) {
+      return;
+    }
+  }
+  current_data_sources_.emplace_back(ds);
+}
+
+void BinderContext::add_current_data_source(const string &alias_name, const DataSource& ds) {
+  data_source_map_.insert({alias_name, ds});
+  if (!unique_data_sources_.contains(ds)) {
+    unique_data_sources_.insert(ds);
+  }
+
+  for (auto cur_ds : current_data_sources_) {
+    if (cur_ds == ds) {
+      return;
+    }
+  }
+  current_data_sources_.emplace_back(ds);
+}
+
 void BinderContext::add_outer_data_source(const DataSource& ds) {
   outer_data_sources_.push_back(ds);
 }

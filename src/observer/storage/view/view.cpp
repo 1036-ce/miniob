@@ -1,10 +1,13 @@
 #include "storage/view/view.h"
+#include "sql/operator/project_physical_operator.h"
+#include "sql/operator/view_project_physical_operator.h"
+#include "sql/optimizer/logical_plan_generator.h"
+#include "sql/optimizer/physical_plan_generator.h"
 #include "sql/parser/parse.h"
 #include "sql/stmt/select_stmt.h"
 #include "storage/common/meta_util.h"
-#include <json/reader.h>
-#include <json/value.h>
-#include <json/writer.h>
+
+#include "json/json.h"
 
 const static Json::StaticString VIEW_FIELD_NAME("name");
 const static Json::StaticString VIEW_FIELD_ORIGINAL_TABLE_NAME("original_table_name");
@@ -235,6 +238,40 @@ const ViewFieldMeta *View::field_meta(const string &name) const
     }
   }
   return nullptr;
+}
+
+
+RC View::gen_physical_plan(Session *session, unique_ptr<PhysicalOperator> &oper) {
+  RC rc = RC::SUCCESS;
+  Db *db = session->get_current_db();
+  unique_ptr<SelectStmt> select_stmt;
+  if (OB_FAIL(rc = create_select_stmt(db, select_sql_, select_stmt))) {
+    LOG_WARN("failed to create select stmt in view");
+    return rc;
+  }
+
+  LogicalPlanGenerator logical_oper_gen{};
+  unique_ptr<LogicalOperator> logical_oper;
+  if (OB_FAIL(rc = logical_oper_gen.create(select_stmt.get(), logical_oper))) {
+    LOG_WARN("failed to create logical operator in view");
+    return rc;
+  }
+
+  PhysicalPlanGenerator physical_oper_gen{};
+  unique_ptr<PhysicalOperator> physical_oper;
+  if (OB_FAIL(rc = physical_oper_gen.create(*logical_oper, physical_oper, session))) {
+    LOG_WARN("failed to create physical operator in view");
+    return rc;
+  }
+
+  ASSERT(physical_oper->type() == PhysicalOperatorType::PROJECT, "view's top physical plan must be PROJECT");
+
+  ProjectPhysicalOperator *proj_oper = static_cast<ProjectPhysicalOperator*>(physical_oper.get());
+  ViewProjectPhysicalOperator* view_proj_oper = new ViewProjectPhysicalOperator(proj_oper->expressions(), *this);
+  view_proj_oper->children().swap(proj_oper->children());
+  oper.reset(view_proj_oper);
+
+  return rc;
 }
 
 RC View::create_select_stmt(Db *db, const string &select_sql, unique_ptr<SelectStmt> &select_stmt)

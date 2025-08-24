@@ -98,7 +98,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
 
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
-  rc = FilterStmt::create(db, binder_context, std::move(select_sql.condition), filter_stmt);
+  rc                      = FilterStmt::create(db, binder_context, std::move(select_sql.condition), filter_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");
     return rc;
@@ -208,8 +208,18 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt, BinderCont
   return RC::SUCCESS;
 }
 
-auto SelectStmt::collect_tables(
-    Db *db, UnboundTable *unbound_table, BinderContext &binder_context) -> RC
+auto SelectStmt::get_data_source(Db *db, const string &name) -> DataSource
+{
+  Table *table = db->find_table(name.c_str());
+  if (table != nullptr) {
+    return DataSource{table};
+  }
+
+  View *view = db->find_view(name.c_str());
+  return DataSource{view};
+}
+
+auto SelectStmt::collect_tables(Db *db, UnboundTable *unbound_table, BinderContext &binder_context) -> RC
 {
   if (UnboundSingleTable *single_table = dynamic_cast<UnboundSingleTable *>(unbound_table); single_table != nullptr) {
     const char *table_name = single_table->relation_name.c_str();
@@ -217,21 +227,35 @@ auto SelectStmt::collect_tables(
       return RC::INVALID_ARGUMENT;
     }
 
-    Table *table = db->find_table(table_name);
-    if (nullptr == table) {
-      LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+    /*     Table *table = db->find_table(table_name);
+     *     if (nullptr == table) {
+     *       LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
+     *       return RC::SCHEMA_TABLE_NOT_EXIST;
+     *     }
+     *
+     *     binder_context.add_current_data_source(table);
+     *     if (!single_table->alias_name.empty()) {
+     *       const char* alias_name = single_table->alias_name.c_str();
+     *       if (binder_context.find_current_data_source(alias_name)) {
+     *         return RC::INVALID_ARGUMENT;
+     *       }
+     *       binder_context.add_current_data_source(alias_name, table);
+     *     } */
+
+    auto ds = get_data_source(db, table_name);
+    if (!ds.is_valid()) {
+      LOG_WARN("no such data source. db=%s, data_source_name=%s", db->name(), table_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
 
-    binder_context.add_current_data_source(table);
+    binder_context.add_current_data_source(ds);
     if (!single_table->alias_name.empty()) {
-      const char* alias_name = single_table->alias_name.c_str();
+      const char *alias_name = single_table->alias_name.c_str();
       if (binder_context.find_current_data_source(alias_name)) {
         return RC::INVALID_ARGUMENT;
       }
-      binder_context.add_current_data_source(alias_name, table);
+      binder_context.add_current_data_source(alias_name, ds);
     }
-    
     return RC::SUCCESS;
   }
 
@@ -251,7 +275,7 @@ auto SelectStmt::collect_tables(
   return RC::UNSUPPORTED;
 }
 
-RC SelectStmt::bind_tables(const BinderContext& binder_context, ExpressionBinder &expr_binder,
+RC SelectStmt::bind_tables(const BinderContext &binder_context, ExpressionBinder &expr_binder,
     UnboundTable *unbound_table, unique_ptr<BoundTable> &bound_table)
 {
   if (UnboundSingleTable *single_table = dynamic_cast<UnboundSingleTable *>(unbound_table); single_table != nullptr) {
@@ -259,7 +283,7 @@ RC SelectStmt::bind_tables(const BinderContext& binder_context, ExpressionBinder
     // Table *table = table_map.at(single_table->relation_name);
     // Table *table = binder_context.find_current_data_source(single_table->relation_name.c_str());
     DataSource ds = binder_context.find_current_data_source(single_table->relation_name.c_str());
-    bound_table  = make_unique<BoundSingleTable>(ds);
+    bound_table   = make_unique<BoundSingleTable>(ds);
     return RC::SUCCESS;
   }
 
@@ -284,7 +308,8 @@ RC SelectStmt::bind_tables(const BinderContext& binder_context, ExpressionBinder
           joined_table->type, std::move(bound_expressions.at(0)), std::move(left_table), std::move(right_table));
       return RC::SUCCESS;
     }
-    bound_table = make_unique<BoundJoinedTable>(joined_table->type, nullptr, std::move(left_table), std::move(right_table));
+    bound_table =
+        make_unique<BoundJoinedTable>(joined_table->type, nullptr, std::move(left_table), std::move(right_table));
     return RC::SUCCESS;
   }
 

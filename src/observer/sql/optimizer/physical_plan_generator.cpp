@@ -62,6 +62,10 @@ RC PhysicalPlanGenerator::create(
       return create_plan(static_cast<CalcLogicalOperator &>(logical_operator), oper, session);
     } break;
 
+    case LogicalOperatorType::VIEW_GET: {
+      return create_plan(static_cast<ViewGetLogicalOperator &>(logical_operator), oper, session);
+    } break;
+
     case LogicalOperatorType::TABLE_GET: {
       return create_plan(static_cast<TableGetLogicalOperator &>(logical_operator), oper, session);
     } break;
@@ -223,6 +227,11 @@ RC PhysicalPlanGenerator::create_plan(
   }
 
   return RC::SUCCESS;
+}
+
+RC PhysicalPlanGenerator::create_plan(ViewGetLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper, Session *session) {
+  View *view = logical_oper.view();
+  return view->gen_physical_plan(session, oper);
 }
 
 RC PhysicalPlanGenerator::create_plan(

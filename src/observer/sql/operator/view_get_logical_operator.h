@@ -10,7 +10,7 @@ public:
   ViewGetLogicalOperator(View* view): view_(view) {}
   virtual ~ViewGetLogicalOperator() = default;
 
-  LogicalOperatorType type() const override { return LogicalOperatorType::TABLE_GET; }
+  LogicalOperatorType type() const override { return LogicalOperatorType::VIEW_GET; }
 
   OpType get_op_type() const override { return OpType::LOGICALGET; }
 

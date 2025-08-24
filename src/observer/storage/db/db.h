@@ -79,6 +79,11 @@ public:
   RC create_view(const string& view_name, const string& select_sql);
 
   /**
+   * @brief 根据名查找视图
+   */
+  View *find_view(const char *view_name) const;
+
+  /**
    * @brief 删除一个表
    * @param table_name 表名
    */

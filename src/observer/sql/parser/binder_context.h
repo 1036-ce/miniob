@@ -19,6 +19,8 @@ public:
   void add_outer_data_source(View *view);
   void add_used_outer_data_source(View *view);
 
+  void add_current_data_source(const DataSource& ds);
+  void add_current_data_source(const string &alias_name, const DataSource& ds);
   void add_outer_data_source(const DataSource& ds);
   void add_used_outer_data_source(const DataSource& ds);
 

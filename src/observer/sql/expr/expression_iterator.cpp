@@ -66,6 +66,7 @@ RC ExpressionIterator::iterate_child_expr(Expression &expr, function<RC(unique_p
     case ExprType::STAR:
     case ExprType::UNBOUND_FIELD:
     case ExprType::TABLE_FIELD:
+    case ExprType::VIEW_FIELD:
     case ExprType::VALUE: {
       // Do nothing
     } break;

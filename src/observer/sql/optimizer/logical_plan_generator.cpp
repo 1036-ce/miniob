@@ -27,6 +27,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/predicate_logical_operator.h"
 #include "sql/operator/project_logical_operator.h"
 #include "sql/operator/table_get_logical_operator.h"
+#include "sql/operator/view_get_logical_operator.h"
 #include "sql/operator/group_by_logical_operator.h"
 
 #include "sql/operator/update_logical_operator.h"
@@ -168,7 +169,6 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     last_oper = &order_by_oper;
   }
 
-
   auto project_oper = make_unique<ProjectLogicalOperator>(std::move(select_stmt->query_expressions()));
   if (*last_oper) {
     project_oper->add_child(std::move(*last_oper));
@@ -200,7 +200,7 @@ RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, unique_ptr<Logical
   }
 
   // for subquery in target_expressions
-  for (auto& expr: update_stmt->target_expressions()) {
+  for (auto &expr : update_stmt->target_expressions()) {
     if (expr->type() != ExprType::SUBQUERY) {
       continue;
     }
@@ -235,7 +235,7 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
   vector<unique_ptr<Expression> *> exprs;
 
   auto subquery_handle = [&](unique_ptr<Expression> &subquery_expr) -> RC {
-    SubQueryExpr               *expr = static_cast<SubQueryExpr *>(subquery_expr.get());
+    SubQueryExpr *expr = static_cast<SubQueryExpr *>(subquery_expr.get());
     if (expr->select_stmt()) {
       unique_ptr<LogicalOperator> logical_oper;
       if (OB_FAIL(rc = create_plan(expr->select_stmt().get(), logical_oper))) {
@@ -278,7 +278,6 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
       }
       continue;
     }
-
   }
 
   logical_operator = make_unique<PredicateLogicalOperator>(std::move(filter_stmt->predicate()), subqueries);
@@ -349,9 +348,14 @@ RC LogicalPlanGenerator::create_plan(ExplainStmt *explain_stmt, unique_ptr<Logic
 RC LogicalPlanGenerator::create_plan(BoundTable *bound_table, unique_ptr<LogicalOperator> &logical_operator)
 {
   if (BoundSingleTable *single_table = dynamic_cast<BoundSingleTable *>(bound_table); single_table != nullptr) {
-    unique_ptr<LogicalOperator> table_get_oper(
-        new TableGetLogicalOperator(single_table->table(), ReadWriteMode::READ_ONLY));
-    logical_operator = std::move(table_get_oper);
+    if (single_table->table()) {
+      unique_ptr<LogicalOperator> table_get_oper(
+          new TableGetLogicalOperator(single_table->table(), ReadWriteMode::READ_ONLY));
+      logical_operator = std::move(table_get_oper);
+    } else {  // view
+      unique_ptr<LogicalOperator> view_get_oper(new ViewGetLogicalOperator(single_table->view()));
+      logical_operator = std::move(view_get_oper);
+    }
     return RC::SUCCESS;
   }
 
@@ -460,12 +464,13 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
   return RC::SUCCESS;
 }
 
-RC LogicalPlanGenerator::create_order_by_plan(SelectStmt *select_stmt, unique_ptr<LogicalOperator> &logical_operator) {
+RC LogicalPlanGenerator::create_order_by_plan(SelectStmt *select_stmt, unique_ptr<LogicalOperator> &logical_operator)
+{
   if (select_stmt->order_by().empty()) {
     logical_operator = nullptr;
     return RC::SUCCESS;
   }
   auto order_by_oper = make_unique<OrderByLogicalOperator>(std::move(select_stmt->order_by()));
-  logical_operator = std::move(order_by_oper);
+  logical_operator   = std::move(order_by_oper);
   return RC::SUCCESS;
 }

@@ -108,7 +108,11 @@ RC ExpressionBinder::bind_expression(unique_ptr<Expression> &expr, vector<unique
     } break;
 
     case ExprType::TABLE_FIELD: {
-      return bind_field_expression(expr, bound_expressions);
+      return bind_table_field_expression(expr, bound_expressions);
+    } break;
+
+    case ExprType::VIEW_FIELD: {
+      return bind_view_field_expression(expr, bound_expressions);
     } break;
 
     case ExprType::VALUE: {
@@ -314,9 +318,14 @@ RC ExpressionBinder::bind_unbound_field_expression(
   return RC::SUCCESS;
 }
 
-RC ExpressionBinder::bind_field_expression(
+RC ExpressionBinder::bind_table_field_expression(
     unique_ptr<Expression> &field_expr, vector<unique_ptr<Expression>> &bound_expressions)
 {
+  bound_expressions.emplace_back(std::move(field_expr));
+  return RC::SUCCESS;
+}
+
+RC ExpressionBinder::bind_view_field_expression(unique_ptr<Expression> &field_expr, vector<unique_ptr<Expression>> &bound_expressions) {
   bound_expressions.emplace_back(std::move(field_expr));
   return RC::SUCCESS;
 }

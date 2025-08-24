@@ -100,6 +100,7 @@ public:
   vector<unique_ptr<OrderBy>>    &order_by() { return order_by_; }
 
 private:
+  static auto get_data_source(Db *db, const string& name) -> DataSource;
   static auto collect_tables(Db *db, UnboundTable *table_ref, BinderContext &binder_context) -> RC;
   static RC bind_tables(const BinderContext &binder_context, ExpressionBinder &expr_binder, UnboundTable *unbound_table,
       unique_ptr<BoundTable> &bound_table);
