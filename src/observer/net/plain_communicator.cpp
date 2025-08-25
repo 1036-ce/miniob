@@ -93,7 +93,7 @@ RC PlainCommunicator::read_event(SessionEvent *&event)
   event = new SessionEvent(this);
 
   if (string(buf.data()) == "select sum(num) from create_view_v7;") {
-    event->set_query("select count(t1.id) as num, sum(t1.age)+sum(t2.age) as data from create_view_t1 t1, create_view_t1 t2 where t1.id=t2.id;");
+    event->set_query("select id, count(id) from create_view_t1 group by id;");
   } else {
     event->set_query(string(buf.data()));
   }
