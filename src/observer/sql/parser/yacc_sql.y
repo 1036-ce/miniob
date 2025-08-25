@@ -848,6 +848,9 @@ table_factor:
       if ($2 != nullptr) {
         tmp->alias_name = $2;
       }
+      else {
+        tmp->alias_name = $1;
+      }
       $$ = tmp;
     }
     ;

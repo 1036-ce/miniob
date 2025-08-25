@@ -11,28 +11,25 @@ public:
 
   void add_current_data_source(Table *table);
   void add_current_data_source(const string &alias_name, Table *table);
-  void add_outer_data_source(Table *table);
-  void add_used_outer_data_source(Table *table);
 
   void add_current_data_source(View *view);
   void add_current_data_source(const string &alias_name, View *view);
-  void add_outer_data_source(View *view);
-  void add_used_outer_data_source(View *view);
 
-  void add_current_data_source(const DataSource& ds);
-  void add_current_data_source(const string &alias_name, const DataSource& ds);
-  void add_outer_data_source(const DataSource& ds);
-  void add_used_outer_data_source(const DataSource& ds);
+  void add_current_data_source(const DataSource &ds);
+  void add_current_data_source(const string &alias_name, const DataSource &ds);
+  void add_outer_data_source(const string &name);
+  void add_used_outer_data_source(const string &name);
 
-  void clear_current_data_sources();
-  void clear_outer_data_sources();
+  DataSource find_current_data_source(const char *name) const;
+  DataSource find_outer_data_source(const char *name) const;
 
-  DataSource find_current_data_source(const char *table_name) const;
-  DataSource find_outer_data_source(const char *table_name) const;
+  vector<DataSource> current_data_sources() const;
+  vector<DataSource> outer_data_sources() const;
+  vector<DataSource> used_outer_data_sources() const;
 
-  const vector<DataSource> &current_data_sources() const { return current_data_sources_; }
-  const vector<DataSource> &outer_data_sources() const { return outer_data_sources_; }
-  const vector<DataSource> &used_outer_data_sources() const { return used_outer_data_sources_; }
+  const vector<string> &current_ds_names() const { return current_ds_names_; }
+  const vector<string> &outer_ds_names() const { return outer_ds_names_; }
+  const vector<string> &used_outer_ds_names() const { return used_outer_ds_names_; }
 
   void set_db(Db *db) { db_ = db; }
   Db  *db() { return db_; }
@@ -40,22 +37,22 @@ public:
   BinderContext gen_sub_context() const
   {
     BinderContext sub_context;
-    sub_context.db_                 = this->db_;
-    sub_context.data_source_map_          = this->data_source_map_;
-    sub_context.unique_data_sources_      = this->unique_data_sources_;
-    sub_context.outer_data_sources_ = this->outer_data_sources_;
-    for (auto table : this->current_data_sources_) {
-      sub_context.outer_data_sources_.push_back(table);
+    sub_context.db_              = this->db_;
+    sub_context.data_source_map_ = this->data_source_map_;
+    // sub_context.unique_data_sources_      = this->unique_data_sources_;
+    sub_context.outer_ds_names_ = this->outer_ds_names_;
+    for (auto table : this->current_ds_names_) {
+      sub_context.outer_ds_names_.push_back(table);
     }
-    sub_context.used_outer_data_sources_.clear();
+    sub_context.used_outer_ds_names_.clear();
     return sub_context;
   }
 
 private:
-  Db             *db_ = nullptr;
-  vector<DataSource> current_data_sources_;
-  vector<DataSource> outer_data_sources_;
-  vector<DataSource> used_outer_data_sources_;
+  Db            *db_ = nullptr;
+  vector<string> current_ds_names_;
+  vector<string> outer_ds_names_;
+  vector<string> used_outer_ds_names_;
 
   struct Hash
   {
@@ -75,6 +72,4 @@ private:
   };
 
   unordered_map<string, DataSource, Hash, EqualTo> data_source_map_;
-  unordered_set<DataSource>                        unique_data_sources_;
 };
-

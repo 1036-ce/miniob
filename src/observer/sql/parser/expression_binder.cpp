@@ -22,30 +22,7 @@ See the Mulan PSL v2 for more details. */
 
 using namespace common;
 
-////////////////////////////////////////////////////////////////////////////////
-/* static void wildcard_fields(Table *table, vector<unique_ptr<Expression>> &expressions, int table_cnt)
- * {
- *   const TableMeta &table_meta = table->table_meta();
- *   const int        field_num  = table_meta.field_num();
- * 
- *   // 通配符会扩展为所有**可见**的field
- *   for (int i = table_meta.unvisible_field_num(); i < field_num; i++) {
- *     Field           field(table, table_meta.field(i));
- *     TableFieldExpr *field_expr = new TableFieldExpr(field);
- * 
- *     string expr_name;
- *     if (table_cnt > 1) {
- *       expr_name = field.table_name();
- *       expr_name.push_back('.');
- *       expr_name.append(field.field_name());
- *     } else {
- *       expr_name = field.field_name();
- *     }
- *     field_expr->set_name(expr_name);
- *     expressions.emplace_back(field_expr);
- *   }
- * } */
-static void wildcard_fields(const DataSource &ds, vector<unique_ptr<Expression>> &expressions, int ds_cnt)
+static void wildcard_fields(const DataSource &ds, vector<unique_ptr<Expression>> &expressions)
 {
   if (ds.table()) {
     Table           *table      = ds.table();
@@ -57,14 +34,7 @@ static void wildcard_fields(const DataSource &ds, vector<unique_ptr<Expression>>
       Field           field(table, table_meta.field(i));
       TableFieldExpr *field_expr = new TableFieldExpr(field);
 
-      string expr_name;
-      if (ds_cnt > 1) {
-        expr_name = field.table_name();
-        expr_name.push_back('.');
-        expr_name.append(field.field_name());
-      } else {
-        expr_name = field.field_name();
-      }
+      string expr_name = field.field_name();
       field_expr->set_name(expr_name);
       expressions.emplace_back(field_expr);
     }
@@ -74,14 +44,7 @@ static void wildcard_fields(const DataSource &ds, vector<unique_ptr<Expression>>
     for (const auto &field_meta : field_metas) {
       ViewFieldExpr *view_field_expr = new ViewFieldExpr(view->name(), field_meta);
 
-      string expr_name;
-      if (ds_cnt > 1) {
-        expr_name = view->name();
-        expr_name.push_back('.');
-        expr_name.append(field_meta.name());
-      } else {
-        expr_name = field_meta.name();
-      }
+      string expr_name = field_meta.name();
       view_field_expr->set_name(expr_name);
       expressions.emplace_back(view_field_expr);
     }
@@ -174,7 +137,7 @@ RC ExpressionBinder::bind_star_expression(
     // tables_to_wildcard.push_back(table);
     ds_to_wildcard.emplace_back(ds);
   } else {
-    const vector<DataSource> &all_ds = context_.current_data_sources();
+    vector<DataSource> all_ds = context_.current_data_sources();
     ds_to_wildcard.insert(ds_to_wildcard.end(), all_ds.begin(), all_ds.end());
     /* const vector<Table *> &all_tables = context_.current_query_tables();
      * tables_to_wildcard.insert(tables_to_wildcard.end(), all_tables.begin(), all_tables.end()); */
@@ -184,66 +147,11 @@ RC ExpressionBinder::bind_star_expression(
    *   wildcard_fields(table, bound_expressions, context_.current_query_tables().size());
    * } */
   for (const auto &ds : ds_to_wildcard) {
-    wildcard_fields(ds, bound_expressions, context_.current_data_sources().size());
+    wildcard_fields(ds, bound_expressions);
   }
 
   return RC::SUCCESS;
 }
-
-/* RC ExpressionBinder::bind_unbound_field_expression(
- *     unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions)
- * {
- *   if (nullptr == expr) {
- *     return RC::SUCCESS;
- *   }
- *
- *   auto unbound_field_expr = static_cast<UnboundFieldExpr *>(expr.get());
- *
- *   const char *table_name = unbound_field_expr->table_name();
- *   const char *field_name = unbound_field_expr->field_name();
- *
- *   Table *table = nullptr;
- *   if (is_blank(table_name)) {
- *     if (context_.current_data_sources().size() != 1) {
- *       LOG_INFO("cannot determine table for field: %s", field_name);
- *       return RC::SCHEMA_TABLE_NOT_EXIST;
- *     }
- *
- *     table = context_.current_data_sources()[0];
- *   } else {
- *     table = context_.find_current_data_source(table_name);
- *     if (nullptr == table) {
- *       table = context_.find_outer_data_source(table_name);
- *       if (nullptr == table) {
- *         LOG_INFO("no such table in BinderContext: %s", table_name);
- *         return RC::SCHEMA_TABLE_NOT_EXIST;
- *       }
- *       context_.add_used_outer_data_source(table);
- *     }
- *   }
- *
- *   if (0 == strcmp(field_name, "*")) {
- *     wildcard_fields(table, bound_expressions, context_.current_data_sources().size());
- *   } else {
- *     const FieldMeta *field_meta = table->table_meta().field(field_name);
- *     if (nullptr == field_meta) {
- *       LOG_INFO("no such field in table: %s.%s", table_name, field_name);
- *       return RC::SCHEMA_FIELD_MISSING;
- *     }
- *
- *     Field           field(table, field_meta);
- *     TableFieldExpr *field_expr = new TableFieldExpr(field);
- *
- *     if (!unbound_field_expr->alias_name().empty()) {
- *       field_expr->set_name(unbound_field_expr->alias_name());
- *     } else {
- *       field_expr->set_name(field_name);
- *     }
- *     bound_expressions.emplace_back(field_expr);
- *   }
- *
- *   return RC::SUCCESS;
- * } */
 
 RC ExpressionBinder::bind_unbound_field_expression(
     unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions)
@@ -273,12 +181,13 @@ RC ExpressionBinder::bind_unbound_field_expression(
         LOG_INFO("no such table in BinderContext: %s", ds_name);
         return RC::SCHEMA_TABLE_NOT_EXIST;
       }
-      context_.add_used_outer_data_source(ds);
+      // context_.add_used_outer_data_source(ds);
+      context_.add_used_outer_data_source(ds_name);
     }
   }
 
   if (0 == strcmp(field_name, "*")) {
-    wildcard_fields(ds, bound_expressions, context_.current_data_sources().size());
+    wildcard_fields(ds, bound_expressions);
   } else {
     if (ds.table() != nullptr) {
       Table *table = ds.table();

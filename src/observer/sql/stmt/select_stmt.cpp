@@ -227,35 +227,26 @@ auto SelectStmt::collect_tables(Db *db, UnboundTable *unbound_table, BinderConte
       return RC::INVALID_ARGUMENT;
     }
 
-    /*     Table *table = db->find_table(table_name);
-     *     if (nullptr == table) {
-     *       LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
-     *       return RC::SCHEMA_TABLE_NOT_EXIST;
-     *     }
-     *
-     *     binder_context.add_current_data_source(table);
-     *     if (!single_table->alias_name.empty()) {
-     *       const char* alias_name = single_table->alias_name.c_str();
-     *       if (binder_context.find_current_data_source(alias_name)) {
-     *         return RC::INVALID_ARGUMENT;
-     *       }
-     *       binder_context.add_current_data_source(alias_name, table);
-     *     } */
-
     auto ds = get_data_source(db, table_name);
     if (!ds.is_valid()) {
       LOG_WARN("no such data source. db=%s, data_source_name=%s", db->name(), table_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
 
-    binder_context.add_current_data_source(ds);
-    if (!single_table->alias_name.empty()) {
-      const char *alias_name = single_table->alias_name.c_str();
-      if (binder_context.find_current_data_source(alias_name)) {
-        return RC::INVALID_ARGUMENT;
-      }
-      binder_context.add_current_data_source(alias_name, ds);
+    const char* alias_name = single_table->alias_name.c_str();
+    if (binder_context.find_current_data_source(alias_name)) {
+      return RC::INVALID_ARGUMENT;
     }
+    binder_context.add_current_data_source(alias_name, ds);
+
+    /* binder_context.add_current_data_source(ds);
+     * if (!single_table->alias_name.empty()) {
+     *   const char *alias_name = single_table->alias_name.c_str();
+     *   if (binder_context.find_current_data_source(alias_name)) {
+     *     return RC::INVALID_ARGUMENT;
+     *   }
+     *   binder_context.add_current_data_source(alias_name, ds);
+     * } */
     return RC::SUCCESS;
   }
 
@@ -282,7 +273,8 @@ RC SelectStmt::bind_tables(const BinderContext &binder_context, ExpressionBinder
     // single_table->relation_name 一定存在
     // Table *table = table_map.at(single_table->relation_name);
     // Table *table = binder_context.find_current_data_source(single_table->relation_name.c_str());
-    DataSource ds = binder_context.find_current_data_source(single_table->relation_name.c_str());
+    // DataSource ds = binder_context.find_current_data_source(single_table->relation_name.c_str());
+    DataSource ds = binder_context.find_current_data_source(single_table->alias_name.c_str());
     bound_table   = make_unique<BoundSingleTable>(ds);
     return RC::SUCCESS;
   }

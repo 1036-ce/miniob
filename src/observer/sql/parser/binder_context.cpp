@@ -4,144 +4,83 @@
 void BinderContext::add_current_data_source(Table *table)
 {
   data_source_map_.insert({table->name(), table});
-  if (!unique_data_sources_.contains(table)) {
-    unique_data_sources_.insert(table);
-  }
-
-  for (auto cur_table : current_data_sources_) {
-    if (cur_table == DataSource{table}) {
-      return;
-    }
-  }
-  current_data_sources_.emplace_back(table);
+  current_ds_names_.push_back(table->name());
 }
 
 void BinderContext::add_current_data_source(const string &alias_name, Table *table)
 {
   data_source_map_.insert({alias_name, table});
-  if (!unique_data_sources_.contains(table)) {
-    unique_data_sources_.insert(table);
-  }
-
-  for (auto cur_table : current_data_sources_) {
-    if (cur_table == DataSource{table}) {
-      return;
-    }
-  }
-  current_data_sources_.emplace_back(table);
+  current_ds_names_.push_back(alias_name);
 }
-
-void BinderContext::add_outer_data_source(Table *table) { outer_data_sources_.emplace_back(table); }
-
-void BinderContext::add_used_outer_data_source(Table *table) { used_outer_data_sources_.emplace_back(table); }
-
 
 void BinderContext::add_current_data_source(View *view) {
   data_source_map_.insert({view->name(), view});
-  if (!unique_data_sources_.contains(view)) {
-    unique_data_sources_.insert(view);
-  }
-
-  for (auto cur_view : current_data_sources_) {
-    if (cur_view == DataSource{view}) {
-      return;
-    }
-  }
-  current_data_sources_.emplace_back(view);
+  current_ds_names_.push_back(view->name());
 }
 
 void BinderContext::add_current_data_source(const string &alias_name, View *view) {
   data_source_map_.insert({alias_name, view});
-  if (!unique_data_sources_.contains(view)) {
-    unique_data_sources_.insert(view);
-  }
-
-  for (auto cur_view : current_data_sources_) {
-    if (cur_view == DataSource{view}) {
-      return;
-    }
-  }
-  current_data_sources_.emplace_back(view);
+  current_ds_names_.push_back(alias_name);
 }
-
-void BinderContext::add_outer_data_source(View *view) {
-  outer_data_sources_.emplace_back(view);
-}
-
-void BinderContext::add_used_outer_data_source(View *view) {
-  used_outer_data_sources_.emplace_back(view);
-}
-
 
 void BinderContext::add_current_data_source(const DataSource& ds) {
   data_source_map_.insert({ds.name(), ds});
-  if (!unique_data_sources_.contains(ds)) {
-    unique_data_sources_.insert(ds);
-  }
-
-  for (auto cur_ds : current_data_sources_) {
-    if (cur_ds == ds) {
-      return;
-    }
-  }
-  current_data_sources_.emplace_back(ds);
+  current_ds_names_.push_back(ds.name());
 }
 
 void BinderContext::add_current_data_source(const string &alias_name, const DataSource& ds) {
   data_source_map_.insert({alias_name, ds});
-  if (!unique_data_sources_.contains(ds)) {
-    unique_data_sources_.insert(ds);
-  }
-
-  for (auto cur_ds : current_data_sources_) {
-    if (cur_ds == ds) {
-      return;
-    }
-  }
-  current_data_sources_.emplace_back(ds);
+  current_ds_names_.push_back(alias_name);
 }
 
-void BinderContext::add_outer_data_source(const DataSource& ds) {
-  outer_data_sources_.push_back(ds);
+void BinderContext::add_outer_data_source(const string &name) {
+  outer_ds_names_.push_back(name);
 }
 
-void BinderContext::add_used_outer_data_source(const DataSource& ds) {
-  used_outer_data_sources_.push_back(ds);
+void BinderContext::add_used_outer_data_source(const string &name) {
+  used_outer_ds_names_.push_back(name);
 }
 
-void BinderContext::clear_current_data_sources()
+DataSource BinderContext::find_current_data_source(const char *name) const
 {
-  current_data_sources_.clear();
-  data_source_map_.clear();
-}
-
-void BinderContext::clear_outer_data_sources() { outer_data_sources_.clear(); }
-
-DataSource BinderContext::find_current_data_source(const char *table_name) const
-{
-  if (!data_source_map_.contains(table_name)) {
-    return DataSource{};
-  }
-  DataSource target = data_source_map_.at(table_name);
-  for (auto& ds : current_data_sources_) {
-    if (ds == target) {
-      return ds;
+  for (auto& ds_name : current_ds_names_) {
+    if (ds_name == name) {
+      return data_source_map_.at(ds_name);
     }
   }
   return DataSource{};
 }
 
-DataSource BinderContext::find_outer_data_source(const char *table_name) const
+DataSource BinderContext::find_outer_data_source(const char *name) const
 {
-  if (!data_source_map_.contains(table_name)) {
-    return DataSource{};
-  }
-  // Table* target = data_source_map_.at(table_name);
-  DataSource target = data_source_map_.at(table_name);
-  for (auto& ds : outer_data_sources_) {
-    if (ds == target) {
-      return ds;
+  for (auto& ds_name : outer_ds_names_) {
+    if (ds_name == name) {
+      return data_source_map_.at(ds_name);
     }
   }
   return DataSource{};
+}
+
+vector<DataSource> BinderContext::current_data_sources() const {
+  vector<DataSource> ret;
+  for (auto& name: current_ds_names_) {
+    ret.push_back(data_source_map_.at(name));
+  }
+  return ret;
+}
+
+vector<DataSource> BinderContext::outer_data_sources() const {
+  vector<DataSource> ret;
+  for (auto& name: outer_ds_names_) {
+    ret.push_back(data_source_map_.at(name));
+  }
+  return ret;
+}
+
+vector<DataSource> BinderContext::used_outer_data_sources() const {
+  vector<DataSource> ret;
+  for (auto& name: used_outer_ds_names_) {
+    ret.push_back(data_source_map_.at(name));
+  }
+  return ret;
 }
