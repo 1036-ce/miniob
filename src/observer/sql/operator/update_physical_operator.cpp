@@ -106,7 +106,9 @@ RC UpdatePhysicalOperator::open(Trx *trx)
 
 RC UpdatePhysicalOperator::next() { return RC::RECORD_EOF; }
 
-RC UpdatePhysicalOperator::close() { return RC::SUCCESS; }
+RC UpdatePhysicalOperator::close() { 
+  return RC::SUCCESS; 
+}
 
 Tuple *UpdatePhysicalOperator::current_tuple() { return nullptr; }
 

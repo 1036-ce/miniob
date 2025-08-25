@@ -54,6 +54,11 @@ RC HashJoinPhysicalOperator::next() {
       return rc;
     }
 
+    // 如果是null值，直接跳过
+    if (right_key.key_.is_null()) {
+      continue;
+    }
+
     auto [beg, end] = ht_.find(right_key);
     if (beg != end) {
       auto& left_tuple = beg.val();
@@ -98,6 +103,11 @@ auto HashJoinPhysicalOperator::build_hash_table() -> RC
     HashJoinKey left_key;
     if (OB_FAIL(rc = left_key_exprs_[0]->get_value(*left_tuple_, left_key.key_))) {
       return rc;
+    }
+
+    // 如果是NULL,不加入hash表
+    if (left_key.key_.is_null()) {
+      continue;
     }
 
     ValueListTuple val_list_tuple;

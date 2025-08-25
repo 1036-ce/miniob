@@ -29,7 +29,7 @@ public:
   virtual ~NestedLoopJoinPhysicalOperator() = default;
 
   string param() const override { 
-    return join_predicate_->to_string();
+    return join_predicate_ == nullptr ? "" : join_predicate_->to_string();
   }
 
   PhysicalOperatorType type() const override { return PhysicalOperatorType::NESTED_LOOP_JOIN; }
