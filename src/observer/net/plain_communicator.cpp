@@ -92,11 +92,7 @@ RC PlainCommunicator::read_event(SessionEvent *&event)
   LOG_INFO("receive command(size=%d): %s", data_len, buf.data());
   event = new SessionEvent(this);
 
-  if (string(buf.data()) == "select sum(num) from create_view_v7;") {
-    event->set_query("select id, count(id) from create_view_t1 group by id;");
-  } else {
-    event->set_query(string(buf.data()));
-  }
+  event->set_query(string(buf.data()));
   return rc;
 }
 

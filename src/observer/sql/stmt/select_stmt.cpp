@@ -222,22 +222,40 @@ auto SelectStmt::get_data_source(Db *db, const string &name) -> DataSource
 auto SelectStmt::collect_tables(Db *db, UnboundTable *unbound_table, BinderContext &binder_context) -> RC
 {
   if (UnboundSingleTable *single_table = dynamic_cast<UnboundSingleTable *>(unbound_table); single_table != nullptr) {
-    const char *table_name = single_table->relation_name.c_str();
-    if (nullptr == table_name) {
+    const char *relation_name = single_table->relation_name.c_str();
+    if (nullptr == relation_name) {
       return RC::INVALID_ARGUMENT;
     }
 
-    auto ds = get_data_source(db, table_name);
+    auto ds = get_data_source(db, relation_name);
     if (!ds.is_valid()) {
-      LOG_WARN("no such data source. db=%s, data_source_name=%s", db->name(), table_name);
+      LOG_WARN("no such data source. db=%s, data_source_name=%s", db->name(), relation_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
 
-    const char* alias_name = single_table->alias_name.c_str();
-    if (binder_context.find_current_data_source(alias_name)) {
-      return RC::INVALID_ARGUMENT;
+    if (single_table->alias_name.empty()) {
+      if (binder_context.find_current_data_source(relation_name)) {
+        LOG_WARN("%s occured more than once", relation_name);
+        return RC::INVALID_ARGUMENT;
+      }
+      binder_context.add_current_data_source(relation_name, ds);
     }
-    binder_context.add_current_data_source(alias_name, ds);
+    else {
+      // 有alias_name, 检查是否与其他table的别名重复
+      const char* alias_name = single_table->alias_name.c_str();
+      if (binder_context.contains(alias_name)) {
+        LOG_WARN("%s occured more than once", relation_name);
+        return RC::INVALID_ARGUMENT;
+      }
+      binder_context.add_current_data_source(alias_name, ds);
+    }
+
+    /* const char* alias_name = single_table->alias_name.c_str();
+     * if (binder_context.contains(alias_name)) {
+     *   LOG_WARN("%s occured more than once", alias_name);
+     *   return RC::INVALID_ARGUMENT;
+     * } 
+     * binder_context.add_current_data_source(alias_name, ds); */
 
     /* binder_context.add_current_data_source(ds);
      * if (!single_table->alias_name.empty()) {
@@ -274,7 +292,15 @@ RC SelectStmt::bind_tables(const BinderContext &binder_context, ExpressionBinder
     // Table *table = table_map.at(single_table->relation_name);
     // Table *table = binder_context.find_current_data_source(single_table->relation_name.c_str());
     // DataSource ds = binder_context.find_current_data_source(single_table->relation_name.c_str());
-    DataSource ds = binder_context.find_current_data_source(single_table->alias_name.c_str());
+    // DataSource ds = binder_context.find_current_data_source(single_table->alias_name.c_str());
+    DataSource ds;
+    if (single_table->alias_name.empty()) {
+      ds = binder_context.find_current_data_source(single_table->relation_name.c_str());
+    }
+    else {
+      ds = binder_context.find_current_data_source(single_table->alias_name.c_str());
+    }
+
     bound_table   = make_unique<BoundSingleTable>(ds);
     return RC::SUCCESS;
   }

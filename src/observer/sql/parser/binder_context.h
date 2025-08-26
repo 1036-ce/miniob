@@ -22,6 +22,7 @@ public:
 
   DataSource find_current_data_source(const char *name) const;
   DataSource find_outer_data_source(const char *name) const;
+  bool       contains(const char *name) const;
 
   vector<DataSource> current_data_sources() const;
   vector<DataSource> outer_data_sources() const;
