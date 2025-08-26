@@ -174,6 +174,23 @@ public:
   void set_schema(const Table *table, const vector<FieldMeta> *fields)
   {
     table_ = table;
+    table_ref_name_ = table->name();
+    // fix:join当中会多次调用右表的open,open当中会调用set_scheme，从而导致tuple当中会存储
+    // 很多无意义的field和value，因此需要先clear掉
+    for (TableFieldExpr *spec : speces_) {
+      delete spec;
+    }
+    this->speces_.clear();
+    this->speces_.reserve(fields->size());
+    for (const FieldMeta &field : *fields) {
+      speces_.push_back(new TableFieldExpr(table, &field));
+    }
+  }
+
+  void set_schema(const Table *table, const vector<FieldMeta> *fields, const string& table_ref_name)
+  {
+    table_ = table;
+    table_ref_name_ = table_ref_name;
     // fix:join当中会多次调用右表的open,open当中会调用set_scheme，从而导致tuple当中会存储
     // 很多无意义的field和value，因此需要先clear掉
     for (TableFieldExpr *spec : speces_) {
@@ -228,7 +245,8 @@ public:
   RC spec_at(int index, TupleCellSpec &spec) const override
   {
     const Field &field = speces_[index]->field();
-    spec               = TupleCellSpec(table_->name(), field.field_name());
+    // spec               = TupleCellSpec(table_->name(), field.field_name());
+    spec               = TupleCellSpec(table_ref_name_.c_str(), field.field_name());
     return RC::SUCCESS;
   }
 
@@ -236,7 +254,8 @@ public:
   {
     const char *table_name = spec.table_name();
     const char *field_name = spec.field_name();
-    if (0 != strcmp(table_name, table_->name())) {
+    // if (0 != strcmp(table_name, table_->name())) {
+    if (0 != strcmp(table_name, table_ref_name_.c_str())) {
       return RC::NOTFOUND;
     }
 
@@ -293,6 +312,7 @@ private:
 
   Record             *record_ = nullptr;
   const Table        *table_  = nullptr;
+  string table_ref_name_;
   vector<TableFieldExpr *> speces_;
 };
 

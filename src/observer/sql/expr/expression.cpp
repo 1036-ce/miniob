@@ -40,7 +40,8 @@ string comp2str(CompOp comp)
 
 RC TableFieldExpr::get_value(const Tuple &tuple, Value &value) const
 {
-  return tuple.find_cell(TupleCellSpec(table_name(), field_name()), value);
+  // return tuple.find_cell(TupleCellSpec(table_name(), field_name()), value);
+  return tuple.find_cell(TupleCellSpec(table_ref_name_.c_str(), field_name()), value);
 }
 
 RC TableFieldExpr::related_tables(vector<const Table *> &tables) const

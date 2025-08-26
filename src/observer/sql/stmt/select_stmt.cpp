@@ -296,12 +296,14 @@ RC SelectStmt::bind_tables(const BinderContext &binder_context, ExpressionBinder
     DataSource ds;
     if (single_table->alias_name.empty()) {
       ds = binder_context.find_current_data_source(single_table->relation_name.c_str());
+      bound_table   = make_unique<BoundSingleTable>(ds, single_table->relation_name);
     }
     else {
       ds = binder_context.find_current_data_source(single_table->alias_name.c_str());
+      bound_table   = make_unique<BoundSingleTable>(ds, single_table->alias_name);
     }
 
-    bound_table   = make_unique<BoundSingleTable>(ds);
+    // bound_table   = make_unique<BoundSingleTable>(ds);
     return RC::SUCCESS;
   }
 

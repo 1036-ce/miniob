@@ -29,7 +29,12 @@ class Table;
 class TableScanPhysicalOperator : public PhysicalOperator
 {
 public:
-  TableScanPhysicalOperator(Table *table, ReadWriteMode mode) : table_(table), mode_(mode) {}
+  TableScanPhysicalOperator(Table *table, ReadWriteMode mode)
+      : table_(table), table_ref_name_(table->name()), mode_(mode)
+  {}
+  TableScanPhysicalOperator(Table *table, const string &table_ref_name, ReadWriteMode mode)
+      : table_(table), table_ref_name_(table_ref_name), mode_(mode)
+  {}
 
   virtual ~TableScanPhysicalOperator() = default;
 
@@ -74,13 +79,14 @@ private:
   RC filter(RowTuple &tuple, bool &result);
 
 private:
-  Table                         *table_ = nullptr;
-  Trx                           *trx_   = nullptr;
-  ReadWriteMode                  mode_  = ReadWriteMode::READ_WRITE;
-  RecordScanner                 *record_scanner_;
-  Record                         current_record_;
-  RowTuple                       tuple_;
-  JoinedTuple                    joined_tuple_;
+  Table         *table_ = nullptr;
+  string         table_ref_name_;
+  Trx           *trx_  = nullptr;
+  ReadWriteMode  mode_ = ReadWriteMode::READ_WRITE;
+  RecordScanner *record_scanner_;
+  Record         current_record_;
+  RowTuple       tuple_;
+  JoinedTuple    joined_tuple_;
   // vector<unique_ptr<Expression>> predicates_;  // TODO chang predicate to table tuple filter
-  unique_ptr<Expression>         predicate_;  // TODO chang predicate to table tuple filter
+  unique_ptr<Expression> predicate_;  // TODO chang predicate to table tuple filter
 };

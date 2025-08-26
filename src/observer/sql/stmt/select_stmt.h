@@ -35,16 +35,22 @@ public:
 class BoundSingleTable : public BoundTable
 {
 public:
-  BoundSingleTable(Table *table) : data_source_(table) {}
-  BoundSingleTable(View *view) : data_source_(view) {}
-  BoundSingleTable(const DataSource& ds) : data_source_(ds) {}
+  BoundSingleTable(Table *table) : data_source_(table), ds_ref_name_(table->name()) {}
+  BoundSingleTable(View *view) : data_source_(view), ds_ref_name_(view->name()) {}
+  BoundSingleTable(const DataSource& ds) : data_source_(ds), ds_ref_name_(ds.name()) {}
+
+  BoundSingleTable(Table *table, const string& ds_ref_name) : data_source_(table), ds_ref_name_(ds_ref_name) {}
+  BoundSingleTable(View *view, const string& ds_ref_name) : data_source_(view), ds_ref_name_(ds_ref_name) {}
+  BoundSingleTable(const DataSource& ds, const string& ds_ref_name) : data_source_(ds), ds_ref_name_(ds_ref_name) {}
 
   Table *table() const { return data_source_.table(); }
   View  *view() const { return data_source_.view(); }
   const DataSource& data_source() const { return data_source_; }
+  const string& ds_ref_name() const { return ds_ref_name_; }
 
 private:
   DataSource data_source_;
+  string ds_ref_name_;
   // Table *table_;
 };
 

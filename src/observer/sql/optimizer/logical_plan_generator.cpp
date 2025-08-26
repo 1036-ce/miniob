@@ -350,7 +350,7 @@ RC LogicalPlanGenerator::create_plan(BoundTable *bound_table, unique_ptr<Logical
   if (BoundSingleTable *single_table = dynamic_cast<BoundSingleTable *>(bound_table); single_table != nullptr) {
     if (single_table->table()) {
       unique_ptr<LogicalOperator> table_get_oper(
-          new TableGetLogicalOperator(single_table->table(), ReadWriteMode::READ_ONLY));
+          new TableGetLogicalOperator(single_table->table(), single_table->ds_ref_name(), ReadWriteMode::READ_ONLY));
       logical_operator = std::move(table_get_oper);
     } else {  // view
       unique_ptr<LogicalOperator> view_get_oper(new ViewGetLogicalOperator(single_table->view()));

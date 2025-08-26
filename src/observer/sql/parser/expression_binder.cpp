@@ -22,7 +22,7 @@ See the Mulan PSL v2 for more details. */
 
 using namespace common;
 
-static void wildcard_fields(const DataSource &ds, vector<unique_ptr<Expression>> &expressions)
+static void wildcard_fields(const DataSource &ds, const string& ds_ref_name, vector<unique_ptr<Expression>> &expressions)
 {
   if (ds.table()) {
     Table           *table      = ds.table();
@@ -32,7 +32,7 @@ static void wildcard_fields(const DataSource &ds, vector<unique_ptr<Expression>>
     // 通配符会扩展为所有**可见**的field
     for (int i = table_meta.unvisible_field_num(); i < field_num; i++) {
       Field           field(table, table_meta.field(i));
-      TableFieldExpr *field_expr = new TableFieldExpr(field);
+      TableFieldExpr *field_expr = new TableFieldExpr(field, ds_ref_name);
 
       string expr_name = field.field_name();
       field_expr->set_name(expr_name);
@@ -123,9 +123,6 @@ RC ExpressionBinder::bind_star_expression(
 
   auto star_expr = static_cast<StarExpr *>(expr.get());
 
-  // vector<Table *> tables_to_wildcard;
-  vector<DataSource> ds_to_wildcard;
-
   const char *ds_name = star_expr->table_name();
   if (!is_blank(ds_name) && 0 != strcmp(ds_name, "*")) {
     auto ds = context_.find_current_data_source(ds_name);
@@ -133,22 +130,34 @@ RC ExpressionBinder::bind_star_expression(
       LOG_INFO("no such table in from list: %s", ds_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
-
-    // tables_to_wildcard.push_back(table);
-    ds_to_wildcard.emplace_back(ds);
-  } else {
-    vector<DataSource> all_ds = context_.current_data_sources();
-    ds_to_wildcard.insert(ds_to_wildcard.end(), all_ds.begin(), all_ds.end());
-    /* const vector<Table *> &all_tables = context_.current_query_tables();
-     * tables_to_wildcard.insert(tables_to_wildcard.end(), all_tables.begin(), all_tables.end()); */
+    wildcard_fields(ds, ds_name, bound_expressions);
+  }
+  else {
+    const auto& ds_names = context_.current_ds_names();
+    for (const auto& name: ds_names) {
+      auto ds = context_.find_current_data_source(name.c_str());
+      wildcard_fields(ds, name, bound_expressions);
+    }
   }
 
-  /* for (Table *table : tables_to_wildcard) {
-   *   wildcard_fields(table, bound_expressions, context_.current_query_tables().size());
-   * } */
-  for (const auto &ds : ds_to_wildcard) {
-    wildcard_fields(ds, bound_expressions);
-  }
+/*   vector<DataSource> ds_to_wildcard;
+ *   const char *ds_name = star_expr->table_name();
+ *   if (!is_blank(ds_name) && 0 != strcmp(ds_name, "*")) {
+ *     auto ds = context_.find_current_data_source(ds_name);
+ *     if (!ds.is_valid()) {
+ *       LOG_INFO("no such table in from list: %s", ds_name);
+ *       return RC::SCHEMA_TABLE_NOT_EXIST;
+ *     }
+ * 
+ *     // tables_to_wildcard.push_back(table);
+ *     ds_to_wildcard.emplace_back(ds);
+ *   } else {
+ *     vector<DataSource> all_ds = context_.current_data_sources();
+ *     ds_to_wildcard.insert(ds_to_wildcard.end(), all_ds.begin(), all_ds.end());
+ *   }
+ *   for (const auto &ds : ds_to_wildcard) {
+ *     wildcard_fields(ds, bound_expressions);
+ *   } */
 
   return RC::SUCCESS;
 }
@@ -187,7 +196,8 @@ RC ExpressionBinder::bind_unbound_field_expression(
   }
 
   if (0 == strcmp(field_name, "*")) {
-    wildcard_fields(ds, bound_expressions);
+    // wildcard_fields(ds, bound_expressions);
+    wildcard_fields(ds, ds_name, bound_expressions);
   } else {
     if (ds.table() != nullptr) {
       Table *table = ds.table();
@@ -197,8 +207,9 @@ RC ExpressionBinder::bind_unbound_field_expression(
         return RC::SCHEMA_FIELD_MISSING;
       }
 
+      string ds_ref_name = is_blank(ds_name) ? context_.current_ds_names().at(0) : ds_name;
       Field           field(table, field_meta);
-      TableFieldExpr *field_expr = new TableFieldExpr(field);
+      TableFieldExpr *field_expr = new TableFieldExpr(field, ds_ref_name);
 
       if (!unbound_field_expr->alias_name().empty()) {
         field_expr->set_name(unbound_field_expr->alias_name());

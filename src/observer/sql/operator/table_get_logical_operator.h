@@ -26,6 +26,7 @@ class TableGetLogicalOperator : public LogicalOperator
 {
 public:
   TableGetLogicalOperator(Table *table, ReadWriteMode mode);
+  TableGetLogicalOperator(Table *table, const string& table_ref_name, ReadWriteMode mode);
   virtual ~TableGetLogicalOperator() = default;
 
   LogicalOperatorType type() const override { return LogicalOperatorType::TABLE_GET; }
@@ -52,6 +53,7 @@ public:
   unique_ptr<LogicalProperty> find_log_prop(const vector<LogicalProperty *> &log_props) override;
 
   Table        *table() const { return table_; }
+  const string& table_ref_name() const { return table_ref_name_; }
   ReadWriteMode read_write_mode() const { return mode_; }
 
   void set_predicate(unique_ptr<Expression> &&exprs);
@@ -59,7 +61,8 @@ public:
 
 private:
   Table        *table_ = nullptr;
-  ReadWriteMode mode_  = ReadWriteMode::READ_WRITE;
+  string        table_ref_name_;
+  ReadWriteMode mode_ = ReadWriteMode::READ_WRITE;
 
   // 与当前表相关的过滤操作，可以尝试在遍历数据时执行
   // 这里的表达式都是比较简单的比较运算，并且左右两边都是取字段表达式或值表达式

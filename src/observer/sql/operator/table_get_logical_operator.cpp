@@ -17,7 +17,11 @@ See the Mulan PSL v2 for more details. */
 #include "catalog/catalog.h"
 
 TableGetLogicalOperator::TableGetLogicalOperator(Table *table, ReadWriteMode mode)
-    : LogicalOperator(), table_(table), mode_(mode)
+    : LogicalOperator(), table_(table), table_ref_name_(table->name()), mode_(mode)
+{}
+
+TableGetLogicalOperator::TableGetLogicalOperator(Table *table, const string& table_ref_name, ReadWriteMode mode)
+    : LogicalOperator(), table_(table), table_ref_name_(table_ref_name), mode_(mode)
 {}
 
 void TableGetLogicalOperator::set_predicate(unique_ptr<Expression> &&exprs)

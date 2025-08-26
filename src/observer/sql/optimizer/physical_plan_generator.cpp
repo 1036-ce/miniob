@@ -220,7 +220,8 @@ RC PhysicalPlanGenerator::create_plan(
     oper = unique_ptr<PhysicalOperator>(index_scan_oper);
     LOG_TRACE("use index scan");
   } else {
-    auto table_scan_oper = new TableScanPhysicalOperator(table, table_get_oper.read_write_mode());
+    // auto table_scan_oper = new TableScanPhysicalOperator(table, table_get_oper.read_write_mode());
+    auto table_scan_oper = new TableScanPhysicalOperator(table, table_get_oper.table_ref_name(),table_get_oper.read_write_mode());
     table_scan_oper->set_predicate(std::move(predicate));
     oper = unique_ptr<PhysicalOperator>(table_scan_oper);
     LOG_TRACE("use table scan");

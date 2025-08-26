@@ -209,14 +209,20 @@ class TableFieldExpr : public Expression
 {
 public:
   TableFieldExpr() = default;
-  TableFieldExpr(const Table *table, const FieldMeta *field) : field_(table, field) {}
-  TableFieldExpr(const Field &field) : field_(field) {}
+  TableFieldExpr(const Table *table, const FieldMeta *field) : field_(table, field), table_ref_name_(table->name()) {}
+  TableFieldExpr(const Field &field) : field_(field), table_ref_name_(field.table()->name()) {}
+  TableFieldExpr(const Table *table, const FieldMeta *field, const string &table_ref_name)
+      : field_(table, field), table_ref_name_(table_ref_name)
+  {}
+  TableFieldExpr(const Field &field, const string &table_ref_name)
+      : field_(field), table_ref_name_(table_ref_name)
+  {}
 
   virtual ~TableFieldExpr() = default;
 
   bool equal(const Expression &other) const override;
 
-  unique_ptr<Expression> copy() const override { return make_unique<TableFieldExpr>(field_); }
+  unique_ptr<Expression> copy() const override { return make_unique<TableFieldExpr>(field_, table_ref_name_); }
 
   ExprType type() const override { return ExprType::TABLE_FIELD; }
   AttrType value_type() const override { return field_.attr_type(); }
@@ -228,6 +234,7 @@ public:
 
   const char *table_name() const { return field_.table_name(); }
   const char *field_name() const { return field_.field_name(); }
+  const char *table_alias_name() const { return table_ref_name_.c_str(); }
 
   RC get_column(Chunk &chunk, Column &column) override;
 
@@ -244,7 +251,8 @@ public:
   }
 
 private:
-  Field field_;
+  Field  field_;
+  string table_ref_name_;
 };
 
 /**
