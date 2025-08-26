@@ -243,7 +243,7 @@ auto SelectStmt::collect_tables(Db *db, UnboundTable *unbound_table, BinderConte
     else {
       // 有alias_name, 检查是否与其他table的别名重复
       const char* alias_name = single_table->alias_name.c_str();
-      if (binder_context.contains(alias_name)) {
+      if (binder_context.find_current_data_source(alias_name)) {
         LOG_WARN("%s occured more than once", relation_name);
         return RC::INVALID_ARGUMENT;
       }

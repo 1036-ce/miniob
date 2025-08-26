@@ -22,7 +22,6 @@ public:
 
   DataSource find_current_data_source(const char *name) const;
   DataSource find_outer_data_source(const char *name) const;
-  bool       contains(const char *name) const;
 
   vector<DataSource> current_data_sources() const;
   vector<DataSource> outer_data_sources() const;
@@ -39,8 +38,12 @@ public:
   {
     BinderContext sub_context;
     sub_context.db_              = this->db_;
-    sub_context.data_source_map_ = this->data_source_map_;
-    // sub_context.unique_data_sources_      = this->unique_data_sources_;
+    // sub_context.ds_map_ = this->ds_map_;
+    sub_context.outer_ds_map_ = this->outer_ds_map_;
+    for (const auto& [k, v]: this->current_ds_map_) {
+      sub_context.outer_ds_map_.insert({k, v});
+    }
+
     sub_context.outer_ds_names_ = this->outer_ds_names_;
     for (auto table : this->current_ds_names_) {
       sub_context.outer_ds_names_.push_back(table);
@@ -72,5 +75,6 @@ private:
     bool operator()(const string &lhs, const string &rhs) const { return 0 == strcasecmp(lhs.c_str(), rhs.c_str()); }
   };
 
-  unordered_map<string, DataSource, Hash, EqualTo> data_source_map_;
+  unordered_map<string, DataSource, Hash, EqualTo> current_ds_map_;
+  unordered_map<string, DataSource, Hash, EqualTo> outer_ds_map_;
 };
