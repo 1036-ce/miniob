@@ -29,7 +29,7 @@ SUCCESS
 Select * from join_table_1 inner join join_table_2 on join_table_1.id=join_table_2.id;
 1 | A | 1 | 2
 2 | B | 2 | 15
-JOIN_TABLE_1.ID | JOIN_TABLE_1.NAME | JOIN_TABLE_2.ID | JOIN_TABLE_2.NUM
+ID | NAME | ID | NUM
 Select join_table_1.name from join_table_1 inner join join_table_2 on join_table_1.id=join_table_2.id;
 A
 B
@@ -40,26 +40,26 @@ Select join_table_2.num from join_table_1 inner join join_table_2 on join_table_
 NUM
 Select * from join_table_1 inner join join_table_2 on join_table_1.id=join_table_2.id inner join join_table_3 on join_table_1.id=join_table_3.id;
 1 | A | 1 | 2 | 1 | 120
-JOIN_TABLE_1.ID | JOIN_TABLE_1.NAME | JOIN_TABLE_2.ID | JOIN_TABLE_2.NUM | JOIN_TABLE_3.ID | JOIN_TABLE_3.NUM2
+ID | NAME | ID | NUM | ID | NUM2
 Select * from join_table_1 inner join join_table_2 on join_table_1.id=join_table_2.id and join_table_2.num>13 where join_table_1.name='b';
 2 | B | 2 | 15
-JOIN_TABLE_1.ID | JOIN_TABLE_1.NAME | JOIN_TABLE_2.ID | JOIN_TABLE_2.NUM
+ID | NAME | ID | NUM
 Select * from join_table_1 inner join join_table_2 on join_table_1.id=join_table_2.id and join_table_2.num>13 where join_table_1.name='a';
-JOIN_TABLE_1.ID | JOIN_TABLE_1.NAME | JOIN_TABLE_2.ID | JOIN_TABLE_2.NUM
+ID | NAME | ID | NUM
 Select * from join_table_1 inner join join_table_2 on join_table_1.id=join_table_2.id and join_table_2.num>23 where join_table_1.name='b';
-JOIN_TABLE_1.ID | JOIN_TABLE_1.NAME | JOIN_TABLE_2.ID | JOIN_TABLE_2.NUM
+ID | NAME | ID | NUM
 
 3. EMPTY
 select * from join_table_1 inner join join_table_empty_1 on join_table_1.id=join_table_empty_1.id;
-JOIN_TABLE_1.ID | JOIN_TABLE_1.NAME | JOIN_TABLE_EMPTY_1.ID | JOIN_TABLE_EMPTY_1.NUM_EMPTY_1
+ID | NAME | ID | NUM_EMPTY_1
 select * from join_table_empty_1 inner join join_table_1 on join_table_empty_1.id=join_table_1.id;
-JOIN_TABLE_EMPTY_1.ID | JOIN_TABLE_EMPTY_1.NUM_EMPTY_1 | JOIN_TABLE_1.ID | JOIN_TABLE_1.NAME
+ID | NUM_EMPTY_1 | ID | NAME
 select * from join_table_empty_1 inner join join_table_empty_2 on join_table_empty_1.id = join_table_empty_2.id;
-JOIN_TABLE_EMPTY_1.ID | JOIN_TABLE_EMPTY_1.NUM_EMPTY_1 | JOIN_TABLE_EMPTY_2.ID | JOIN_TABLE_EMPTY_2.NUM_EMPTY_2
+ID | NUM_EMPTY_1 | ID | NUM_EMPTY_2
 select * from join_table_1 inner join join_table_2 on join_table_1.id = join_table_2.id inner join join_table_empty_1 on join_table_1.id=join_table_empty_1.id;
-JOIN_TABLE_1.ID | JOIN_TABLE_1.NAME | JOIN_TABLE_2.ID | JOIN_TABLE_2.NUM | JOIN_TABLE_EMPTY_1.ID | JOIN_TABLE_EMPTY_1.NUM_EMPTY_1
+ID | NAME | ID | NUM | ID | NUM_EMPTY_1
 select * from join_table_empty_1 inner join join_table_1 on join_table_empty_1.id=join_table_1.id inner join join_table_2 on join_table_1.id=join_table_2.id;
-JOIN_TABLE_EMPTY_1.ID | JOIN_TABLE_EMPTY_1.NUM_EMPTY_1 | JOIN_TABLE_1.ID | JOIN_TABLE_1.NAME | JOIN_TABLE_2.ID | JOIN_TABLE_2.NUM
+ID | NUM_EMPTY_1 | ID | NAME | ID | NUM
 
 4. VERY LARGE JOIN
 create table join_table_large_1(id int, num1 int);
@@ -1372,7 +1372,7 @@ select * from join_table_large_1 inner join join_table_large_2 on join_table_lar
 9 | 9 | 9 | 9 | 9 | 9 | 9 | 9 | 97 | 97 | 97 | 97
 9 | 9 | 9 | 9 | 9 | 9 | 9 | 9 | 98 | 98 | 98 | 98
 9 | 9 | 9 | 9 | 9 | 9 | 9 | 9 | 99 | 99 | 99 | 99
-JOIN_TABLE_LARGE_1.ID | JOIN_TABLE_LARGE_1.NUM1 | JOIN_TABLE_LARGE_2.ID | JOIN_TABLE_LARGE_2.NUM2 | JOIN_TABLE_LARGE_3.ID | JOIN_TABLE_LARGE_3.NUM3 | JOIN_TABLE_LARGE_4.ID | JOIN_TABLE_LARGE_4.NUM4 | JOIN_TABLE_LARGE_5.ID | JOIN_TABLE_LARGE_5.NUM5 | JOIN_TABLE_LARGE_6.ID | JOIN_TABLE_LARGE_6.NUM6
+ID | NUM1 | ID | NUM2 | ID | NUM3 | ID | NUM4 | ID | NUM5 | ID | NUM6
 
 5. CORNER CASE
 SELECT JOIN_TABLE_1.ID FROM JOIN_TABLE_1 INNER JOIN JOIN_TABLE_2 ON JOIN_TABLE_1.NAME=JOIN_TABLE_2.NAME;

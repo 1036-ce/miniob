@@ -25,3 +25,5 @@ select * from t_alias_1 t1 where id in (select t2.id from t_alias_2 t2 where t2.
 
 select t1.id as num, t1.col1 as age, t1.feat1, t2.* from t_alias_1 t1, t_alias_2 t2 where t1.id < t2.id;
 select * as alias from t_alias_1 t1;
+
+select * from t_alias_1 t where id in (select id from t_alias_2 t);
