@@ -20,6 +20,7 @@ int VectorType::compare(const Value &left, const Value &right) const
     if (res != 0) {
       return res;
     }
+    ++pos;
   }
   if (left_size == right_size) {
     return 0;
