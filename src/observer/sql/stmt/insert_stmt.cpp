@@ -18,9 +18,6 @@ See the Mulan PSL v2 for more details. */
 #include "storage/db/db.h"
 #include "storage/table/table.h"
 
-/* InsertStmt::InsertStmt(Table *table, const Value *values, int value_amount)
- *     : table_(table), values_(values), value_amount_(value_amount)
- * {} */
 InsertStmt::InsertStmt(Table *table, const vector<Value>& values): table_(table), values_(values) {}
 
 RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
@@ -75,49 +72,6 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
   }
 
   return InsertStmt::create(table, values, stmt);
-
-  /* // check whether the table exists
-   * Table *table = db->find_table(table_name);
-   * if (nullptr == table) {
-   *   LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
-   *   return RC::SCHEMA_TABLE_NOT_EXIST;
-   * } */
-
-/*   // check the fields number
- *   const Value     *values     = inserts.values.data();
- *   const int        value_num  = static_cast<int>(inserts.values.size());
- *   const TableMeta &table_meta = table->table_meta();
- *   const int        visible_field_num  = table_meta.visible_field_num();
- *   if (visible_field_num != value_num) {
- *     LOG_WARN("schema mismatch. value num=%d, field num in schema=%d", value_num, visible_field_num);
- *     return RC::SCHEMA_FIELD_MISSING;
- *   } 
- * 
- *   // check whether value can be null
- *   const int unvisible_field_num = table_meta.unvisible_field_num();
- *   for (int i = unvisible_field_num; i < table_meta.field_num(); ++i) {
- *     const FieldMeta *field_meta = table_meta.field(i);
- *     if (!field_meta->nullable() && values[i - unvisible_field_num].is_null()) {
- *       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
- *     }
- *   }
- * 
- *   // check text length
- *   for (int i = unvisible_field_num; i < table_meta.field_num(); ++i) {
- *     const AttrType field_type = table_meta.field(i)->type();
- *     const Value& value = values[i - unvisible_field_num];
- *     if (field_type == AttrType::TEXT && value.attr_type() == AttrType::CHARS) {
- *       if (value.length() > TEXT_MAX_SIZE) {
- *         LOG_WARN("This string is too long");
- *         return RC::INVALID_ARGUMENT;
- *       }
- *     }
- *   }
- * 
- *   // everything alright
- *   // stmt = new InsertStmt(table, values, value_num);
- *   stmt = new InsertStmt(table, inserts.values);
- *   return RC::SUCCESS; */
 }
 
 RC InsertStmt::create(Table* table, const vector<Value>& values, Stmt *&stmt) {

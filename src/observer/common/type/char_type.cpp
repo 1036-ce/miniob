@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/type/date_type.h"
 #include "common/type/float_type.h"
 #include "common/type/integer_type.h"
+#include "common/type/vector_type.h"
 #include "common/value.h"
 
 int CharType::compare(const Value &left, const Value &right) const
@@ -48,6 +49,9 @@ RC CharType::cast_to(const Value &val, AttrType type, Value &result) const
     case AttrType::FLOATS: {
       rc = FloatType().set_value_from_str(result, val.value_.pointer_value_);
     } break;
+    case AttrType::VECTORS: {
+      rc = VectorType().set_value_from_str(result, val.value_.pointer_value_);
+    } break;
     default: return RC::UNIMPLEMENTED;
   }
   return rc;
@@ -58,6 +62,7 @@ int CharType::cast_cost(AttrType type)
   switch (type) {
     case AttrType::CHARS: return 0;
     case AttrType::DATES: return 1;
+    case AttrType::VECTORS: return 1;
     case AttrType::INTS: return 1;
     case AttrType::FLOATS: return 1;
     default: return INT32_MAX;

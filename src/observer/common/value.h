@@ -206,11 +206,12 @@ public:
    * 获取对应的值
    * 如果当前的类型与期望获取的类型不符，就会执行转换操作
    */
-  int    get_int() const;
-  float  get_float() const;
-  string get_string() const;
-  bool   get_boolean() const;
-  LobID  get_lob_id() const;
+  int            get_int() const;
+  float          get_float() const;
+  string         get_string() const;
+  bool           get_boolean() const;
+  LobID          get_lob_id() const;
+  vector<float> *get_vector() const;
 
   char *get_bitmap_data();
 
@@ -224,6 +225,10 @@ public:
   void set_bitmap(const char *s, int len);
   void set_bitmap_from_other(const Value &other);
   void set_null(bool is_null);
+  void set_vector(const vector<float>& vec);
+  void set_vector(vector<float>&& vec);
+  void set_vector(const float* vec, int size);
+  void set_vector_from_other(const Value &other);
 
 private:
   AttrType attr_type_ = AttrType::UNDEFINED;
@@ -231,12 +236,13 @@ private:
 
   union Val
   {
-    int32_t int_value_;
-    int32_t date_value_;
-    float   float_value_;
-    bool    bool_value_;
-    LobID   lob_id_value_;
-    char   *pointer_value_;
+    int32_t        int_value_;
+    int32_t        date_value_;
+    float          float_value_;
+    bool           bool_value_;
+    LobID          lob_id_value_;
+    char          *pointer_value_;
+    vector<float> *vector_value_;
   } value_ = {.int_value_ = 0};
 
   /// 是否申请并占有内存, 目前对于 CHARS 类型 own_data_ 为true, 其余类型 own_data_ 为false

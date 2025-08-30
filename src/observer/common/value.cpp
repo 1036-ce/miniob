@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/sstream.h"
 #include "common/lang/string.h"
 #include "common/log/log.h"
+#include <cstring>
 
 Value::Value(int val) { set_int(val); }
 
@@ -40,6 +41,9 @@ Value::Value(const Value &other)
     } break;
     case AttrType::BITMAP: {
       set_bitmap_from_other(other);
+    } break;
+    case AttrType::VECTORS: {
+      set_vector_from_other(other);
     } break;
 
     default: {
@@ -75,6 +79,9 @@ Value &Value::operator=(const Value &other)
     } break;
     case AttrType::BITMAP: {
       set_bitmap_from_other(other);
+    } break;
+    case AttrType::VECTORS: {
+      set_vector_from_other(other);
     } break;
 
     default: {
@@ -132,6 +139,12 @@ void Value::reset()
         value_.pointer_value_ = nullptr;
       }
       break;
+    case AttrType::VECTORS:
+      if (own_data_ && value_.vector_value_ != nullptr) {
+        delete value_.vector_value_;
+        value_.vector_value_ = nullptr;
+      }
+      break;
     default: break;
   }
 
@@ -153,7 +166,7 @@ void Value::set_data(char *data, int length)
     } break;
     case AttrType::TEXT: {
       value_.lob_id_value_ = *(LobID *)data;
-      length_           = length;
+      length_              = length;
     } break;
     case AttrType::FLOATS: {
       value_.float_value_ = *(float *)data;
@@ -169,6 +182,9 @@ void Value::set_data(char *data, int length)
     } break;
     case AttrType::BITMAP: {
       set_bitmap(data, length);
+    } break;
+    case AttrType::VECTORS: {
+      set_vector(reinterpret_cast<float *>(data), length / sizeof(float));
     } break;
     default: {
       LOG_WARN("unknown data type: %d", attr_type_);
@@ -252,6 +268,13 @@ void Value::set_value(const Value &value)
     case AttrType::BOOLEANS: {
       set_boolean(value.get_boolean());
     } break;
+    case AttrType::VECTORS: {
+      if (value.get_vector() == nullptr) {
+        set_vector(nullptr, 0);
+      } else {
+        set_vector(*value.get_vector());
+      }
+    }
     default: {
       ASSERT(false, "got an invalid value type");
     } break;
@@ -294,6 +317,49 @@ void Value::set_bitmap_from_other(const Value &other)
 
 void Value::set_null(bool is_null) { is_null_ = is_null; }
 
+void Value::set_vector(const vector<float> &vec)
+{
+  reset();
+  attr_type_           = AttrType::VECTORS;
+  value_.vector_value_ = new vector<float>(vec.begin(), vec.end());
+  length_              = sizeof(float) * vec.size();
+}
+
+void Value::set_vector(vector<float> &&vec)
+{
+  reset();
+  attr_type_           = AttrType::VECTORS;
+  value_.vector_value_ = new vector<float>;
+  value_.vector_value_->swap(vec);
+  length_ = sizeof(float) * vec.size();
+}
+
+void Value::set_vector(const float *vec, int size)
+{
+  reset();
+  attr_type_ = AttrType::VECTORS;
+  if (vec == nullptr) {
+    value_.vector_value_ = nullptr;
+    length_              = 0;
+  } else {
+    own_data_            = true;
+    value_.vector_value_ = new vector<float>(size);
+    length_              = size * sizeof(float);
+    memcpy(value_.vector_value_->data(), vec, size * sizeof(float));
+  }
+}
+
+void Value::set_vector_from_other(const Value &other)
+{
+  ASSERT(attr_type_ == AttrType::VECTORS, "attr type is not VECTORS");
+  if (own_data_ && other.value_.vector_value_ != nullptr && length_ != 0) {
+    int size                   = other.length_ / sizeof(float);
+    this->value_.vector_value_ = new vector<float>(size);
+    memcpy(this->value_.vector_value_->data(), other.value_.vector_value_->data(), other.length_);
+    this->length_ = other.length_;
+  }
+}
+
 const char *Value::data() const
 {
   switch (attr_type_) {
@@ -302,6 +368,12 @@ const char *Value::data() const
     } break;
     case AttrType::BITMAP: {
       return value_.pointer_value_;
+    } break;
+    case AttrType::VECTORS: {
+      if (value_.vector_value_ == nullptr) {
+        return nullptr;
+      }
+      return reinterpret_cast<const char *>(value_.vector_value_->data());
     } break;
     default: {
       return (const char *)&value_;
@@ -429,6 +501,15 @@ LobID Value::get_lob_id() const
 {
   ASSERT(attr_type_ == AttrType::TEXT, "attr_type_ must be TEXT");
   return value_.lob_id_value_;
+}
+
+vector<float> *Value::get_vector() const
+{
+  if (attr_type_ != AttrType::VECTORS) {
+    LOG_DEBUG("AttrType::%s cannot get vector", attr_type_to_string(attr_type_));
+    return nullptr;
+  }
+  return value_.vector_value_;
 }
 
 char *Value::get_bitmap_data()

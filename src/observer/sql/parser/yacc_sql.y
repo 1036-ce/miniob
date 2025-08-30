@@ -456,7 +456,12 @@ attr_def:
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
-      $$->length = $4;
+      if ($$->type == AttrType::VECTORS) {
+        $$->length = $4 * sizeof(float);
+      }
+      else {
+        $$->length = $4;
+      }
       $$->nullable = $6;
     }
     | ID type null_opt
