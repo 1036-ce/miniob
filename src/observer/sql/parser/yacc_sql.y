@@ -107,6 +107,8 @@ SubQueryExpr *create_subquery_expression(const vector<Value>& value_list) {
         UPDATE
         LBRACE
         RBRACE
+        LBRACKET
+        RBRACKET
         COMMA
         TRX_BEGIN
         TRX_COMMIT
@@ -167,6 +169,7 @@ SubQueryExpr *create_subquery_expression(const vector<Value>& value_list) {
   vector<RelAttrSqlNode> *                   rel_attr_list;
   UnboundTable*                              table_ref;
   vector<string> *                           key_list;
+  vector<float> *                            number_list;
   Assignment *                               assignment;
   std::vector<unique_ptr<Assignment>> *      assignment_list;
   OrderBy*                                   order_by_entry;
@@ -203,6 +206,7 @@ SubQueryExpr *create_subquery_expression(const vector<Value>& value_list) {
 %type <cstring>             storage_format
 %type <key_list>            primary_key
 %type <key_list>            attr_list
+%type <number_list>         number_list
 %type <table_ref>           table_refs
 %type <table_ref>           table_factor
 %type <table_ref>           joined_table
@@ -543,6 +547,35 @@ insert_stmt:        /*insert   语句的语法解析树*/
     }
     ;
 
+number_list:
+    NUMBER {
+      $$ = new vector<float>();
+      $$->push_back((float)$1);
+    }
+    | FLOAT {
+      $$ = new vector<float>();
+      $$->push_back((float)$1);
+    }
+    | NUMBER COMMA number_list {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new vector<float>;
+      }
+
+      $$->insert($$->begin(), (float)$1);
+    }
+    | FLOAT COMMA number_list {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new vector<float>;
+      }
+
+      $$->insert($$->begin(), (float)$1);
+    }
+    ;
+
 value:
     NUMBER {
       $$ = new Value((int)$1);
@@ -556,6 +589,11 @@ value:
       char *tmp = common::substr($1,1,strlen($1)-2);
       $$ = new Value(tmp);
       free(tmp);
+    }
+    | LBRACKET number_list RBRACKET {
+      $$ = new Value;
+      $$->set_vector(std::move(*$2));
+      delete $2;
     }
     |NULL_T {
       $$ = new Value((int)0);

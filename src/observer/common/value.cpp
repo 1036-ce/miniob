@@ -322,8 +322,8 @@ void Value::set_vector(const vector<float> &vec)
   reset();
   own_data_ = true;
   attr_type_           = AttrType::VECTORS;
-  value_.vector_value_ = new vector<float>(vec.begin(), vec.end());
   length_              = sizeof(float) * vec.size();
+  value_.vector_value_ = new vector<float>(vec.begin(), vec.end());
 }
 
 void Value::set_vector(vector<float> &&vec)
@@ -331,9 +331,9 @@ void Value::set_vector(vector<float> &&vec)
   reset();
   own_data_ = true;
   attr_type_           = AttrType::VECTORS;
+  length_ = sizeof(float) * vec.size();
   value_.vector_value_ = new vector<float>;
   value_.vector_value_->swap(vec);
-  length_ = sizeof(float) * vec.size();
 }
 
 void Value::set_vector(const float *vec, int size)
@@ -354,7 +354,7 @@ void Value::set_vector(const float *vec, int size)
 void Value::set_vector_from_other(const Value &other)
 {
   ASSERT(attr_type_ == AttrType::VECTORS, "attr type is not VECTORS");
-  if (own_data_ && other.value_.vector_value_ != nullptr && length_ != 0) {
+  if (other.own_data_ && other.value_.vector_value_ != nullptr && other.length_ != 0) {
     int size                   = other.length_ / sizeof(float);
     this->value_.vector_value_ = new vector<float>(size);
     memcpy(this->value_.vector_value_->data(), other.value_.vector_value_->data(), other.length_);
