@@ -320,6 +320,7 @@ void Value::set_null(bool is_null) { is_null_ = is_null; }
 void Value::set_vector(const vector<float> &vec)
 {
   reset();
+  own_data_ = true;
   attr_type_           = AttrType::VECTORS;
   value_.vector_value_ = new vector<float>(vec.begin(), vec.end());
   length_              = sizeof(float) * vec.size();
@@ -328,6 +329,7 @@ void Value::set_vector(const vector<float> &vec)
 void Value::set_vector(vector<float> &&vec)
 {
   reset();
+  own_data_ = true;
   attr_type_           = AttrType::VECTORS;
   value_.vector_value_ = new vector<float>;
   value_.vector_value_->swap(vec);
