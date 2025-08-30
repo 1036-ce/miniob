@@ -759,7 +759,7 @@ RC ArithmeticExpr::to_computable()
       if (OB_FAIL(rc = VectorType{}.set_value_from_str(vector_val, left_val.get_string()))) {
         return rc;
       }
-      if (vector_val.length() != left_->value_length()) {
+      if (vector_val.length() != right_->value_length()) {
         return RC::INVALID_ARGUMENT;
       }
       left_.reset(new ValueExpr(vector_val));
