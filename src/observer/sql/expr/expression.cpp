@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/expr/expression.h"
+#include "common/type/vector_type.h"
 #include "sql/expr/subquery_expression.h"
 #include "sql/expr/tuple.h"
 #include "sql/expr/arithmetic_operator.hpp"
@@ -394,38 +395,39 @@ RC ComparisonExpr::comp_notin_handler(const Tuple &tuple, Value &value) const
   return rc;
 }
 
-bool ComparisonExpr::match(const string& target, const string& pattern) const {
-	size_t pos = 0;
-	while (pos < target.size() && pos < pattern.size()) {
-		if (pattern.at(pos) == '%') {
-			break;
-		}
-		if (pattern.at(pos) == '_') {
-			++pos;
-			continue;
-		}
-		if (target.at(pos) != pattern.at(pos)) {
-			return false;
-		}
-		++pos;
-	}
+bool ComparisonExpr::match(const string &target, const string &pattern) const
+{
+  size_t pos = 0;
+  while (pos < target.size() && pos < pattern.size()) {
+    if (pattern.at(pos) == '%') {
+      break;
+    }
+    if (pattern.at(pos) == '_') {
+      ++pos;
+      continue;
+    }
+    if (target.at(pos) != pattern.at(pos)) {
+      return false;
+    }
+    ++pos;
+  }
 
-	if (pos < pattern.size() && pattern.at(pos) == '%') {
-		string pattern_remainder = pattern.substr(pos + 1);
-		while (pos <= target.size()) {
-			string target_remainder = target.substr(pos);
-			if (match(target_remainder, pattern_remainder)) {
-				return true;
-			}
-			++pos;
-		}
-	}
+  if (pos < pattern.size() && pattern.at(pos) == '%') {
+    string pattern_remainder = pattern.substr(pos + 1);
+    while (pos <= target.size()) {
+      string target_remainder = target.substr(pos);
+      if (match(target_remainder, pattern_remainder)) {
+        return true;
+      }
+      ++pos;
+    }
+  }
 
-	if (pos == target.size() && pos == pattern.size()) {
-		return true;
-	}
+  if (pos == target.size() && pos == pattern.size()) {
+    return true;
+  }
 
-	return false;
+  return false;
 }
 
 RC ComparisonExpr::to_compareable()
@@ -707,10 +709,78 @@ bool ArithmeticExpr::equal(const Expression &other) const
   return arithmetic_type_ == other_arith_expr.arithmetic_type() && left_->equal(*other_arith_expr.left_) &&
          right_->equal(*other_arith_expr.right_);
 }
+
+RC ArithmeticExpr::to_computable()
+{
+  RC rc = RC::SUCCESS;
+
+  if (left_->value_type() == AttrType::VECTORS) {
+    if (!right_) {
+      if (arithmetic_type_ == Type::NEGATIVE) {
+        return RC::INVALID_ARGUMENT;
+      }
+      return RC::SUCCESS;
+    }
+
+    if (arithmetic_type_ == Type::DIV) {
+      return RC::INVALID_ARGUMENT;
+    }
+
+    if (right_->type() == ExprType::VALUE && right_->value_type() == AttrType::CHARS) {
+      ValueExpr *right_val_expr = static_cast<ValueExpr*>(right_.get());
+      Value right_val;
+      right_val_expr->get_value(right_val);
+      Value vector_val;
+      if (OB_FAIL(rc = VectorType{}.set_value_from_str(vector_val, right_val.get_string()))) {
+        return rc;
+      }
+      if (vector_val.length() != left_->value_length()) {
+        return RC::INVALID_ARGUMENT;
+      }
+      right_.reset(new ValueExpr(vector_val));
+      return RC::SUCCESS;
+    }
+    if (left_->value_length() != right_->value_length()) {
+      return RC::INVALID_ARGUMENT;
+    }
+    return RC::SUCCESS;
+  }
+
+  if (right_ && right_->value_type() == AttrType::VECTORS) {
+    if (arithmetic_type_ == Type::DIV) {
+      return RC::INVALID_ARGUMENT;
+    }
+
+    if (left_->type() == ExprType::VALUE && left_->value_type() == AttrType::CHARS) {
+      ValueExpr *left_val_expr = static_cast<ValueExpr*>(left_.get());
+      Value left_val;
+      left_val_expr->get_value(left_val);
+      Value vector_val;
+      if (OB_FAIL(rc = VectorType{}.set_value_from_str(vector_val, left_val.get_string()))) {
+        return rc;
+      }
+      if (vector_val.length() != left_->value_length()) {
+        return RC::INVALID_ARGUMENT;
+      }
+      left_.reset(new ValueExpr(vector_val));
+      return RC::SUCCESS;
+    }
+    if (left_->value_length() != right_->value_length()) {
+      return RC::INVALID_ARGUMENT;
+    }
+    return RC::SUCCESS;
+  }
+  return RC::SUCCESS;
+}
+
 AttrType ArithmeticExpr::value_type() const
 {
   if (!right_) {
     return left_->value_type();
+  }
+
+  if (left_->value_type() == AttrType::VECTORS && right_->value_type() == AttrType::VECTORS) {
+    return AttrType::VECTORS;
   }
 
   if (left_->value_type() == AttrType::INTS && right_->value_type() == AttrType::INTS &&
@@ -730,23 +800,23 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
 
   switch (arithmetic_type_) {
     case Type::ADD: {
-      Value::add(left_value, right_value, value);
+      rc = Value::add(left_value, right_value, value);
     } break;
 
     case Type::SUB: {
-      Value::subtract(left_value, right_value, value);
+      rc = Value::subtract(left_value, right_value, value);
     } break;
 
     case Type::MUL: {
-      Value::multiply(left_value, right_value, value);
+      rc = Value::multiply(left_value, right_value, value);
     } break;
 
     case Type::DIV: {
-      Value::divide(left_value, right_value, value);
+      rc = Value::divide(left_value, right_value, value);
     } break;
 
     case Type::NEGATIVE: {
-      Value::negative(left_value, value);
+      rc = Value::negative(left_value, value);
     } break;
 
     default: {

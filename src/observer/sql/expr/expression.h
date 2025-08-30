@@ -40,6 +40,7 @@ enum class ExprType
   STAR,                 ///< 星号，表示所有字段
   UNBOUND_FIELD,        ///< 未绑定的字段，需要在resolver阶段解析为FieldExpr
   UNBOUND_AGGREGATION,  ///< 未绑定的聚合函数，需要在resolver阶段解析为AggregateExpr
+  UNBOUND_VECTOR_FUNC,  ///< 未绑定的向量函数表达式, 需要在resolver阶段解析为VectorFuncExpr
 
   TABLE_FIELD,  ///< 字段。在实际执行时，根据行数据内容提取对应字段的值
   VIEW_FIELD,
@@ -50,6 +51,7 @@ enum class ExprType
   ARITHMETIC,   ///< 算术运算
   AGGREGATION,  ///< 聚合运算
   SUBQUERY,     ///< 子查询表达式
+  VECTOR_FUNC,  ///< 向量函数表达式
 };
 
 /**
@@ -506,13 +508,16 @@ public:
   bool     equal(const Expression &other) const override;
   ExprType type() const override { return ExprType::ARITHMETIC; }
 
+  RC to_computable();
+
   AttrType value_type() const override;
   int      value_length() const override
   {
-    if (!right_) {
-      return left_->value_length();
-    }
-    return 4;  // sizeof(float) or sizeof(int)
+    return left_->value_length();
+    /* if (!right_) {
+     *   return left_->value_length();
+     * }
+     * return 4;  // sizeof(float) or sizeof(int) */
   };
 
   RC get_value(const Tuple &tuple, Value &value) const override;

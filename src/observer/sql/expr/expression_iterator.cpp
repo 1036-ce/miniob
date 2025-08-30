@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/expr/expression_iterator.h"
 #include "sql/expr/expression.h"
+#include "sql/expr/vector_func_expr.h"
 #include "common/log/log.h"
 
 using namespace std;
@@ -54,6 +55,15 @@ RC ExpressionIterator::iterate_child_expr(Expression &expr, function<RC(unique_p
       rc = callback(arithmetic_expr.left());
       if (OB_SUCC(rc) && arithmetic_expr.right()) {
         rc = callback(arithmetic_expr.right());
+      }
+    } break;
+
+    case ExprType::VECTOR_FUNC: {
+
+      auto &vector_func_expr = static_cast<VectorFuncExpr &>(expr);
+      rc = callback(vector_func_expr.left_child());
+      if (OB_SUCC(rc)) {
+        rc = callback(vector_func_expr.right_child());
       }
     } break;
 

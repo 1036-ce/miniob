@@ -28,11 +28,16 @@ public:
   RC subtract(const Value &left, const Value &right, Value &result) const override;
   RC multiply(const Value &left, const Value &right, Value &result) const override;
 
-  RC cast_to(const Value &val, AttrType type, Value &result) const override;
+  RC  cast_to(const Value &val, AttrType type, Value &result) const override;
   int cast_cost(AttrType type) override;
 
   RC set_value_from_str(Value &val, const string &data) const override;
   RC to_string(const Value &val, string &result) const override;
+
+  RC l2_distance(const Value &left, const Value &right, Value &result) const;
+  RC cosine_distance(const Value &left, const Value &right, Value &result) const;
+  RC inner_product(const Value &left, const Value &right, Value &result) const;
+
 private:
-  RC str2float(const char* &pos, float& val) const;
+  RC str2float(const char *&pos, float &val) const;
 };

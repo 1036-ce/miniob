@@ -18,11 +18,13 @@ See the Mulan PSL v2 for more details. */
 #include "sql/parser/expression_binder.h"
 #include "sql/expr/expression_iterator.h"
 #include "sql/expr/subquery_expression.h"
+#include "sql/expr/vector_func_expr.h"
 #include "sql/expr/view_field_expr.h"
 
 using namespace common;
 
-static void wildcard_fields(const DataSource &ds, const string& ds_ref_name, vector<unique_ptr<Expression>> &expressions)
+static void wildcard_fields(
+    const DataSource &ds, const string &ds_ref_name, vector<unique_ptr<Expression>> &expressions)
 {
   if (ds.table()) {
     Table           *table      = ds.table();
@@ -70,6 +72,10 @@ RC ExpressionBinder::bind_expression(unique_ptr<Expression> &expr, vector<unique
       return bind_aggregate_expression(expr, bound_expressions);
     } break;
 
+    case ExprType::UNBOUND_VECTOR_FUNC: {
+      return bind_vectorfunc_expression(expr, bound_expressions);
+    } break;
+
     case ExprType::TABLE_FIELD: {
       return bind_table_field_expression(expr, bound_expressions);
     } break;
@@ -106,6 +112,10 @@ RC ExpressionBinder::bind_expression(unique_ptr<Expression> &expr, vector<unique
       ASSERT(false, "shouldn't be here");
     } break;
 
+    case ExprType::VECTOR_FUNC: {
+      ASSERT(false, "shouldn't be here");
+    } break;
+
     default: {
       LOG_WARN("unknown expression type: %d", static_cast<int>(expr->type()));
       return RC::INTERNAL;
@@ -131,33 +141,32 @@ RC ExpressionBinder::bind_star_expression(
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
     wildcard_fields(ds, ds_name, bound_expressions);
-  }
-  else {
-    const auto& ds_names = context_.current_ds_names();
-    for (const auto& name: ds_names) {
+  } else {
+    const auto &ds_names = context_.current_ds_names();
+    for (const auto &name : ds_names) {
       auto ds = context_.find_current_data_source(name.c_str());
       wildcard_fields(ds, name, bound_expressions);
     }
   }
 
-/*   vector<DataSource> ds_to_wildcard;
- *   const char *ds_name = star_expr->table_name();
- *   if (!is_blank(ds_name) && 0 != strcmp(ds_name, "*")) {
- *     auto ds = context_.find_current_data_source(ds_name);
- *     if (!ds.is_valid()) {
- *       LOG_INFO("no such table in from list: %s", ds_name);
- *       return RC::SCHEMA_TABLE_NOT_EXIST;
- *     }
- * 
- *     // tables_to_wildcard.push_back(table);
- *     ds_to_wildcard.emplace_back(ds);
- *   } else {
- *     vector<DataSource> all_ds = context_.current_data_sources();
- *     ds_to_wildcard.insert(ds_to_wildcard.end(), all_ds.begin(), all_ds.end());
- *   }
- *   for (const auto &ds : ds_to_wildcard) {
- *     wildcard_fields(ds, bound_expressions);
- *   } */
+  /*   vector<DataSource> ds_to_wildcard;
+   *   const char *ds_name = star_expr->table_name();
+   *   if (!is_blank(ds_name) && 0 != strcmp(ds_name, "*")) {
+   *     auto ds = context_.find_current_data_source(ds_name);
+   *     if (!ds.is_valid()) {
+   *       LOG_INFO("no such table in from list: %s", ds_name);
+   *       return RC::SCHEMA_TABLE_NOT_EXIST;
+   *     }
+   *
+   *     // tables_to_wildcard.push_back(table);
+   *     ds_to_wildcard.emplace_back(ds);
+   *   } else {
+   *     vector<DataSource> all_ds = context_.current_data_sources();
+   *     ds_to_wildcard.insert(ds_to_wildcard.end(), all_ds.begin(), all_ds.end());
+   *   }
+   *   for (const auto &ds : ds_to_wildcard) {
+   *     wildcard_fields(ds, bound_expressions);
+   *   } */
 
   return RC::SUCCESS;
 }
@@ -200,14 +209,14 @@ RC ExpressionBinder::bind_unbound_field_expression(
     wildcard_fields(ds, ds_name, bound_expressions);
   } else {
     if (ds.table() != nullptr) {
-      Table *table = ds.table();
+      Table           *table      = ds.table();
       const FieldMeta *field_meta = table->table_meta().field(field_name);
       if (nullptr == field_meta) {
         LOG_INFO("no such field in table: %s.%s", ds_name, field_name);
         return RC::SCHEMA_FIELD_MISSING;
       }
 
-      string ds_ref_name = is_blank(ds_name) ? context_.current_ds_names().at(0) : ds_name;
+      string          ds_ref_name = is_blank(ds_name) ? context_.current_ds_names().at(0) : ds_name;
       Field           field(table, field_meta);
       TableFieldExpr *field_expr = new TableFieldExpr(field, ds_ref_name);
 
@@ -217,9 +226,8 @@ RC ExpressionBinder::bind_unbound_field_expression(
         field_expr->set_name(field_name);
       }
       bound_expressions.emplace_back(field_expr);
-    }
-    else {
-      View *view = ds.view();
+    } else {
+      View                *view       = ds.view();
       const ViewFieldMeta *field_meta = view->field_meta(field_name);
       if (nullptr == field_meta) {
         LOG_INFO("no such field in view: %s.%s", ds_name, field_name);
@@ -245,7 +253,9 @@ RC ExpressionBinder::bind_table_field_expression(
   return RC::SUCCESS;
 }
 
-RC ExpressionBinder::bind_view_field_expression(unique_ptr<Expression> &field_expr, vector<unique_ptr<Expression>> &bound_expressions) {
+RC ExpressionBinder::bind_view_field_expression(
+    unique_ptr<Expression> &field_expr, vector<unique_ptr<Expression>> &bound_expressions)
+{
   bound_expressions.emplace_back(std::move(field_expr));
   return RC::SUCCESS;
 }
@@ -441,6 +451,11 @@ RC ExpressionBinder::bind_arithmetic_expression(
     }
   }
 
+  // 在arithmetic_expr的left和right绑定完成后，做to_computable
+  if (OB_FAIL(rc = arithmetic_expr->to_computable())) {
+    return rc;
+  }
+
   if (!expr->alias_name().empty()) {
     expr->set_name(expr->alias_name());
   }
@@ -543,6 +558,69 @@ RC ExpressionBinder::bind_aggregate_expression(
   }
 
   bound_expressions.emplace_back(std::move(aggregate_expr));
+  return RC::SUCCESS;
+}
+
+RC ExpressionBinder::bind_vectorfunc_expression(
+    unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions)
+{
+  if (nullptr == expr) {
+    return RC::SUCCESS;
+  }
+
+  auto unbound_vector_func_expr = static_cast<UnboundVectorFuncExpr *>(expr.get());
+  const char* function_name = unbound_vector_func_expr->function_name();
+  VectorFuncExpr::Type func_type;
+  RC                  rc = VectorFuncExpr::type_from_string(function_name, func_type);
+
+  vector<unique_ptr<Expression>> child_bound_expressions;
+  unique_ptr<Expression>        &left_expr  = unbound_vector_func_expr->left_child();
+  unique_ptr<Expression>        &right_expr = unbound_vector_func_expr->right_child();
+
+  rc = bind_expression(left_expr, child_bound_expressions);
+  if (OB_FAIL(rc)) {
+    return rc;
+  }
+
+  if (child_bound_expressions.size() != 1) {
+    LOG_WARN("invalid left children number of comparison expression: %d", child_bound_expressions.size());
+    return RC::INVALID_ARGUMENT;
+  }
+
+  unique_ptr<Expression> &left = child_bound_expressions[0];
+  if (left.get() != left_expr.get()) {
+    left_expr.reset(left.release());
+  }
+
+  child_bound_expressions.clear();
+  rc = bind_expression(right_expr, child_bound_expressions);
+  if (OB_FAIL(rc)) {
+    return rc;
+  }
+
+  if (child_bound_expressions.size() != 1) {
+    LOG_WARN("invalid right children number of comparison expression: %d", child_bound_expressions.size());
+    return RC::INVALID_ARGUMENT;
+  }
+
+  unique_ptr<Expression> &right = child_bound_expressions[0];
+  if (right.get() != right_expr.get()) {
+    right_expr.reset(right.release());
+  }
+
+  auto vector_func_expr = make_unique<VectorFuncExpr>(func_type, std::move(left_expr), std::move(right_expr));
+  if (!unbound_vector_func_expr->alias_name().empty()) {
+    vector_func_expr->set_name(unbound_vector_func_expr->alias_name());
+  } else {
+    vector_func_expr->set_name(unbound_vector_func_expr->name());
+  }
+
+  // 在vector_func_expr的left和right绑定完成后，做to_computable
+  if (OB_FAIL(rc = vector_func_expr->to_computable())) {
+    return rc;
+  }
+
+  bound_expressions.emplace_back(std::move(vector_func_expr));
   return RC::SUCCESS;
 }
 

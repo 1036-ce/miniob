@@ -47,6 +47,8 @@ private:
       unique_ptr<Expression> &arithmetic_expr, vector<unique_ptr<Expression>> &bound_expressions);
   RC bind_aggregate_expression(
       unique_ptr<Expression> &aggregate_expr, vector<unique_ptr<Expression>> &bound_expressions);
+  RC bind_vectorfunc_expression(
+      unique_ptr<Expression> &vector_func_expr, vector<unique_ptr<Expression>> &bound_expressions);
   RC bind_subquery_expression(unique_ptr<Expression> &subquery_expr, vector<unique_ptr<Expression>> &bound_expressions);
 
 private:

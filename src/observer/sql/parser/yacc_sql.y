@@ -11,6 +11,7 @@
 #include "sql/parser/lex_sql.h"
 #include "sql/expr/expression.h"
 #include "sql/expr/subquery_expression.h"
+#include "sql/expr/vector_func_expr.h"
 
 using namespace std;
 
@@ -46,6 +47,18 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
                                            YYLTYPE *llocp)
 {
   UnboundAggregateExpr *expr = new UnboundAggregateExpr(aggregate_name, child);
+  expr->set_name(token_name(sql_string, llocp));
+  return expr;
+}
+
+
+UnboundVectorFuncExpr *create_vectorfunc_expression(const char *function_name,
+                                           Expression *left_child,
+                                           Expression *right_child,
+                                           const char *sql_string,
+                                           YYLTYPE *llocp)
+{
+  UnboundVectorFuncExpr *expr = new UnboundVectorFuncExpr(function_name, left_child, right_child);
   expr->set_name(token_name(sql_string, llocp));
   return expr;
 }
@@ -807,6 +820,9 @@ simple_expr:
     }
     | ID LBRACE expression RBRACE {
       $$ = create_aggregate_expression($1, $3, sql_string, &@$);
+    }
+    | ID LBRACE expression COMMA expression RBRACE {
+      $$ = create_vectorfunc_expression($1, $3, $5, sql_string, &@$);
     }
     | subquery_expr {
       $$ = $1;

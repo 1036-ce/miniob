@@ -2,6 +2,7 @@
 #include "common/type/vector_type.h"
 #include "common/type/char_type.h"
 #include "common/value.h"
+#include <cmath>
 
 int VectorType::compare(const Value &left, const Value &right) const
 {
@@ -196,5 +197,80 @@ RC VectorType::to_string(const Value &val, string &result) const
   }
   ss << "]";
   result = ss.str();
+  return RC::SUCCESS;
+}
+
+RC VectorType::l2_distance(const Value &left, const Value &right, Value &result) const {
+  if (left.attr_type() != AttrType::VECTORS || right.attr_type() != AttrType::VECTORS) {
+    return RC::INVALID_ARGUMENT;
+  }
+  vector<float> *left_vec  = left.get_vector();
+  vector<float> *right_vec = right.get_vector();
+  if (left_vec->size() != right_vec->size()) {
+    return RC::INVALID_ARGUMENT;
+  }
+
+  int           size = left_vec->size();
+  float val = 0;
+  float tmp;
+  for (int i = 0; i < size; ++i) {
+    tmp = left_vec->at(i) - right_vec->at(i);
+    val += tmp * tmp;
+  }
+  val = std::sqrt(val);
+  result.set_float(val);
+  return RC::SUCCESS;
+}
+
+RC VectorType::cosine_distance(const Value &left, const Value &right, Value &result) const {
+  if (left.attr_type() != AttrType::VECTORS || right.attr_type() != AttrType::VECTORS) {
+    return RC::INVALID_ARGUMENT;
+  }
+  vector<float> *left_vec  = left.get_vector();
+  vector<float> *right_vec = right.get_vector();
+  if (left_vec->size() != right_vec->size()) {
+    return RC::INVALID_ARGUMENT;
+  }
+
+  int           size = left_vec->size();
+  float val = 0;
+  float up = 0;
+  float left_norm = 0;
+  float right_norm = 0;
+  for (int i = 0; i < size; ++i) {
+    up += left_vec->at(i) * right_vec->at(i);
+    left_norm += left_vec->at(i) * left_vec->at(i);
+    right_norm += right_vec->at(i) * right_vec->at(i);
+  }
+  left_norm = std::sqrt(left_norm);
+  right_norm = std::sqrt(right_norm);
+
+  if (left_norm == 0 || right_norm == 0) {
+    result.set_float(0);
+    result.set_null(true);
+  }
+  else {
+    val = 1 - up/(left_norm * right_norm);
+    result.set_float(val);
+  }
+  return RC::SUCCESS;
+}
+
+RC VectorType::inner_product(const Value &left, const Value &right, Value &result) const {
+  if (left.attr_type() != AttrType::VECTORS || right.attr_type() != AttrType::VECTORS) {
+    return RC::INVALID_ARGUMENT;
+  }
+  vector<float> *left_vec  = left.get_vector();
+  vector<float> *right_vec = right.get_vector();
+  if (left_vec->size() != right_vec->size()) {
+    return RC::INVALID_ARGUMENT;
+  }
+
+  int           size = left_vec->size();
+  float val = 0;
+  for (int i = 0; i < size; ++i) {
+    val += left_vec->at(i) * right_vec->at(i);
+  }
+  result.set_float(val);
   return RC::SUCCESS;
 }
