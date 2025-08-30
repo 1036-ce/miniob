@@ -47,52 +47,39 @@ RC VectorFuncExpr::calc_value(const Value &left_value, const Value &right_value,
 
 RC VectorFuncExpr::get_column(Chunk &chunk, Column &column) { return RC::SUCCESS; }
 
-RC VectorFuncExpr::to_computable() {
+RC VectorFuncExpr::to_computable()
+{
   RC rc = RC::SUCCESS;
 
-  if (left_child_->value_type() == AttrType::VECTORS) {
-    if (right_child_->type() == ExprType::VALUE && right_child_->value_type() == AttrType::CHARS) {
-      ValueExpr *right_val_expr = static_cast<ValueExpr*>(right_child_.get());
-      Value right_val;
-      right_val_expr->get_value(right_val);
-      Value vector_val;
-      if (OB_FAIL(rc = VectorType{}.set_value_from_str(vector_val, right_val.get_string()))) {
-        return rc;
-      }
-      if (vector_val.length() != left_child_->value_length()) {
-        return RC::INVALID_ARGUMENT;
-      }
-      right_child_.reset(new ValueExpr(vector_val));
-      return RC::SUCCESS;
+  if (left_child_->type() == ExprType::VALUE && left_child_->value_type() == AttrType::CHARS) {
+    ValueExpr *left_val_expr = static_cast<ValueExpr *>(left_child_.get());
+    Value      left_val;
+    left_val_expr->get_value(left_val);
+    Value vector_val;
+    if (OB_FAIL(rc = VectorType{}.set_value_from_str(vector_val, left_val.get_string()))) {
+      return rc;
     }
-    if (left_child_->value_length() != right_child_->value_length()) {
-      return RC::INVALID_ARGUMENT;
-    }
-    return RC::SUCCESS;
+    left_child_.reset(new ValueExpr(vector_val));
   }
 
-  if (right_child_->value_type() == AttrType::VECTORS) {
-    if (left_child_->type() == ExprType::VALUE && left_child_->value_type() == AttrType::CHARS) {
-      ValueExpr *left_val_expr = static_cast<ValueExpr*>(left_child_.get());
-      Value left_val;
-      left_val_expr->get_value(left_val);
-      Value vector_val;
-      if (OB_FAIL(rc = VectorType{}.set_value_from_str(vector_val, left_val.get_string()))) {
-        return rc;
-      }
-      if (vector_val.length() != left_child_->value_length()) {
-        return RC::INVALID_ARGUMENT;
-      }
-      left_child_.reset(new ValueExpr(vector_val));
-      return RC::SUCCESS;
+  if (right_child_->type() == ExprType::VALUE && right_child_->value_type() == AttrType::CHARS) {
+    ValueExpr *right_val_expr = static_cast<ValueExpr *>(right_child_.get());
+    Value      right_val;
+    right_val_expr->get_value(right_val);
+    Value vector_val;
+    if (OB_FAIL(rc = VectorType{}.set_value_from_str(vector_val, right_val.get_string()))) {
+      return rc;
     }
-    if (left_child_->value_length() != right_child_->value_length()) {
-      return RC::INVALID_ARGUMENT;
-    }
-    return RC::SUCCESS;
+    right_child_.reset(new ValueExpr(vector_val));
+  }
+
+  if (left_child_->value_type() != AttrType::VECTORS || right_child_->value_type() != AttrType::VECTORS) {
+    return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+  }
+  if (left_child_->value_length() != right_child_->value_length()) {
+    return RC::SCHEMA_FIELD_TYPE_MISMATCH;
   }
   return RC::SUCCESS;
-
 }
 
 RC VectorFuncExpr::type_from_string(const char *type_str, Type &type)

@@ -572,6 +572,10 @@ RC ExpressionBinder::bind_vectorfunc_expression(
   const char* function_name = unbound_vector_func_expr->function_name();
   VectorFuncExpr::Type func_type;
   RC                  rc = VectorFuncExpr::type_from_string(function_name, func_type);
+  if (OB_FAIL(rc)) {
+    LOG_WARN("invalid vector function name: %s", function_name);
+    return rc;
+  }
 
   vector<unique_ptr<Expression>> child_bound_expressions;
   unique_ptr<Expression>        &left_expr  = unbound_vector_func_expr->left_child();
