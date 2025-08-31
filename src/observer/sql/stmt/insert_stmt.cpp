@@ -95,7 +95,7 @@ RC InsertStmt::create(Table* table, const vector<Value>& values, Stmt *&stmt) {
 
   // check text length
   for (int i = unvisible_field_num; i < table_meta.field_num(); ++i) {
-    const AttrType field_type = table_meta.field(i)->type();
+    const AttrType field_type = table_meta.field(i)->real_type();
     const Value& value = values[i - unvisible_field_num];
     if (field_type == AttrType::TEXT && value.attr_type() == AttrType::CHARS) {
       if (value.length() > TEXT_MAX_SIZE) {

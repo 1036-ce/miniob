@@ -52,6 +52,11 @@ RC FieldMeta::init(
     return RC::INVALID_ARGUMENT;
   }
 
+  if (attr_type == AttrType::VECTORS && attr_len > VECTOR_MAX_SIZE * sizeof(float)) {
+    LOG_WARN("can not create table with more than %d dimension vector", VECTOR_MAX_SIZE);
+    return RC::INVALID_ARGUMENT;
+  }
+
   name_        = name;
   attr_type_   = attr_type;
   attr_len_    = attr_len;

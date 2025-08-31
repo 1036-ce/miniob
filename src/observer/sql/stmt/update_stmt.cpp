@@ -222,7 +222,7 @@ RC UpdateStmt::create(Db* db, Table *table, vector<unique_ptr<Assignment>> assig
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
       // check text length
-      if (field_meta->type() == AttrType::TEXT && tmp.attr_type() == AttrType::CHARS) {
+      if (field_meta->real_type() == AttrType::TEXT && tmp.attr_type() == AttrType::CHARS) {
         if (tmp.length() > TEXT_MAX_SIZE) {
           LOG_WARN("This string is too long");
           return RC::INVALID_ARGUMENT;

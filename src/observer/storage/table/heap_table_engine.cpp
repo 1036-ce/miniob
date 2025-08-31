@@ -115,7 +115,7 @@ RC HeapTableEngine::make_record(int value_num, const Value *values, Record &reco
             if (OB_FAIL(rc = Value::cast_to(value, AttrType::VECTORS, vector_val))) {
               break;
             }
-            if (vector_val.length() != field->real_len()) {
+            if (vector_val.length() > VECTOR_MAX_SIZE * sizeof(float) || vector_val.length() != field->real_len()) {
               rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
               break;
             }
@@ -128,7 +128,7 @@ RC HeapTableEngine::make_record(int value_num, const Value *values, Record &reco
             LOG_DEBUG("make a lob record for vector");
           }
           else if (value.attr_type() == AttrType::VECTORS) {
-            if (value.length() != field->real_len()) {
+            if (value.length() > VECTOR_MAX_SIZE * sizeof(float) || value.length() != field->real_len()) {
               rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
               break;
             }
