@@ -12,7 +12,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/string.h"
 #include "common/type/attr_type.h"
 
-const char *ATTR_TYPE_NAME[] = {"undefined", "chars", "ints", "floats", "vectors", "booleans", "dates", "bitmap", "text"};
+const char *ATTR_TYPE_NAME[] = {"undefined", "chars", "ints", "floats", "vectors", "booleans", "dates", "bitmap", "text", "lobid"};
 
 const char *attr_type_to_string(AttrType type)
 {
@@ -30,8 +30,4 @@ AttrType attr_type_from_string(const char *s)
     }
   }
   return AttrType::UNDEFINED;
-}
-
-bool is_lob_type(AttrType type) {
-  return type == AttrType::TEXT;
 }

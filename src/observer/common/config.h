@@ -6,3 +6,5 @@ constexpr static const char* NULL_BITMAP_FIELD_NAME = "__null_bitmap";
 constexpr static int NULL_BITMAP_FIELD_ID = (1 << 16);
 constexpr static int TEXT_MAX_SIZE = 65535;
 constexpr static int INDEX_MAX_COLUMN_COUNT = 8;
+constexpr static int MAX_INLINE_VECTOR_SIZE = 1500;
+constexpr static int VECTOR_MAX_SIZE = 16001;

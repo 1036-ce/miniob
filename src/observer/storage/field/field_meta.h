@@ -37,9 +37,11 @@ public:
 
 public:
   const char *name() const;
-  AttrType    type() const;
+  AttrType    type() const; // 返回record中保存的值的类型，对于lob不是真实类型
+  AttrType    real_type() const;
   int         offset() const;
-  int         len() const;
+  int         len() const; // 返回record中保存的值的长度，对于lob不是真实长度
+  int         real_len() const;
   bool        visible() const;
   int         field_id() const;
   bool        nullable() const;
@@ -51,6 +53,9 @@ public:
   void      to_json(Json::Value &json_value) const;
   static RC from_json(const Json::Value &json_value, FieldMeta &field);
 
+private:
+  void lob_type_handle();
+
 protected:
   string   name_;
   AttrType attr_type_;
@@ -59,4 +64,6 @@ protected:
   bool     visible_;
   int      field_id_;
   bool     nullable_;
+  AttrType lob_type_;  // 如果一个类型为lob类型，该字段保存该类型，否则为UNDIFINED
+  int      lob_len_;   // 如果一个类型为lob类型且定长，该字段保存该类型的长度，否则为-1
 };

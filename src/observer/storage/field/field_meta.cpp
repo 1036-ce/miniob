@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "storage/field/field_meta.h"
+#include "common/config.h"
 #include "common/lang/string.h"
 #include "common/log/log.h"
 #include "sql/parser/parse_defs.h"
@@ -27,15 +28,18 @@ const static Json::StaticString FIELD_VISIBLE("visible");
 const static Json::StaticString FIELD_FIELD_ID("FIELD_id");
 const static Json::StaticString FIELD_NULLABLE("nullable");
 
-FieldMeta::FieldMeta() : attr_type_(AttrType::UNDEFINED), attr_offset_(-1), attr_len_(0), visible_(false), field_id_(0) {}
+FieldMeta::FieldMeta() : attr_type_(AttrType::UNDEFINED), attr_offset_(-1), attr_len_(0), visible_(false), field_id_(0)
+{}
 
-FieldMeta::FieldMeta(const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible, int field_id, bool nullable)
+FieldMeta::FieldMeta(
+    const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible, int field_id, bool nullable)
 {
   [[maybe_unused]] RC rc = this->init(name, attr_type, attr_offset, attr_len, visible, field_id, nullable);
   ASSERT(rc == RC::SUCCESS, "failed to init field meta. rc=%s", strrc(rc));
 }
 
-RC FieldMeta::init(const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible, int field_id, bool nullable)
+RC FieldMeta::init(
+    const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible, int field_id, bool nullable)
 {
   if (common::is_blank(name)) {
     LOG_WARN("Name cannot be empty");
@@ -53,8 +57,10 @@ RC FieldMeta::init(const char *name, AttrType attr_type, int attr_offset, int at
   attr_len_    = attr_len;
   attr_offset_ = attr_offset;
   visible_     = visible;
-  field_id_ = field_id;
-  nullable_ = nullable;
+  field_id_    = field_id;
+  nullable_    = nullable;
+
+  lob_type_handle();
 
   LOG_INFO("Init a field with name=%s", name);
   return RC::SUCCESS;
@@ -64,9 +70,25 @@ const char *FieldMeta::name() const { return name_.c_str(); }
 
 AttrType FieldMeta::type() const { return attr_type_; }
 
+AttrType FieldMeta::real_type() const
+{
+  if (lob_type_ != AttrType::UNDEFINED) {
+    return lob_type_;
+  }
+  return attr_type_;
+}
+
 int FieldMeta::offset() const { return attr_offset_; }
 
 int FieldMeta::len() const { return attr_len_; }
+
+int FieldMeta::real_len() const
+{
+  if (lob_len_ != -1) {
+    return lob_len_;
+  }
+  return attr_len_;
+}
 
 bool FieldMeta::visible() const { return visible_; }
 
@@ -82,11 +104,11 @@ void FieldMeta::desc(ostream &os) const
 
 void FieldMeta::to_json(Json::Value &json_value) const
 {
-  json_value[FIELD_NAME]    = name_;
-  json_value[FIELD_TYPE]    = attr_type_to_string(attr_type_);
-  json_value[FIELD_OFFSET]  = attr_offset_;
-  json_value[FIELD_LEN]     = attr_len_;
-  json_value[FIELD_VISIBLE] = visible_;
+  json_value[FIELD_NAME]     = name_;
+  json_value[FIELD_TYPE]     = attr_type_to_string(attr_type_);
+  json_value[FIELD_OFFSET]   = attr_offset_;
+  json_value[FIELD_LEN]      = attr_len_;
+  json_value[FIELD_VISIBLE]  = visible_;
   json_value[FIELD_FIELD_ID] = field_id_;
   json_value[FIELD_NULLABLE] = nullable_;
 }
@@ -98,11 +120,11 @@ RC FieldMeta::from_json(const Json::Value &json_value, FieldMeta &field)
     return RC::INTERNAL;
   }
 
-  const Json::Value &name_value    = json_value[FIELD_NAME];
-  const Json::Value &type_value    = json_value[FIELD_TYPE];
-  const Json::Value &offset_value  = json_value[FIELD_OFFSET];
-  const Json::Value &len_value     = json_value[FIELD_LEN];
-  const Json::Value &visible_value = json_value[FIELD_VISIBLE];
+  const Json::Value &name_value     = json_value[FIELD_NAME];
+  const Json::Value &type_value     = json_value[FIELD_TYPE];
+  const Json::Value &offset_value   = json_value[FIELD_OFFSET];
+  const Json::Value &len_value      = json_value[FIELD_LEN];
+  const Json::Value &visible_value  = json_value[FIELD_VISIBLE];
   const Json::Value &field_id_value = json_value[FIELD_FIELD_ID];
   const Json::Value &nullable_value = json_value[FIELD_NULLABLE];
 
@@ -142,11 +164,30 @@ RC FieldMeta::from_json(const Json::Value &json_value, FieldMeta &field)
     return RC::INTERNAL;
   }
 
-  const char *name    = name_value.asCString();
-  int         offset  = offset_value.asInt();
-  int         len     = len_value.asInt();
-  bool        visible = visible_value.asBool();
-  int         field_id  = field_id_value.asInt();
-  bool        nullable  = nullable_value.asBool();
+  const char *name     = name_value.asCString();
+  int         offset   = offset_value.asInt();
+  int         len      = len_value.asInt();
+  bool        visible  = visible_value.asBool();
+  int         field_id = field_id_value.asInt();
+  bool        nullable = nullable_value.asBool();
   return field.init(name, type, offset, len, visible, field_id, nullable);
+}
+
+void FieldMeta::lob_type_handle() {
+  if (attr_type_ == AttrType::TEXT) {
+    lob_type_ = AttrType::TEXT;
+    lob_len_ = -1;
+    attr_type_ = AttrType::LOBID;
+    attr_len_ = sizeof(LobID);
+  }
+  else if (attr_type_ == AttrType::VECTORS && attr_len_ > MAX_INLINE_VECTOR_SIZE) {
+    attr_type_ = AttrType::LOBID;
+    lob_type_ = AttrType::VECTORS;
+    lob_len_ = attr_len_;
+    attr_len_ = sizeof(LobID);
+  }
+  else {
+    lob_type_ = AttrType::UNDEFINED;
+    lob_len_ = -1;
+  }
 }

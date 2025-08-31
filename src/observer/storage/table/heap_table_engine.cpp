@@ -99,27 +99,108 @@ RC HeapTableEngine::make_record(int value_num, const Value *values, Record &reco
 
     if (field->type() != value.attr_type()) {
       Value real_value;
-      if (field->type() == AttrType::TEXT && value.attr_type() == AttrType::CHARS) {
-        LobID  lob_id{};
-        size_t length = std::min(value.length(), TEXT_MAX_SIZE);
-        if (OB_FAIL(rc = lob_manager_->insert_lob(value.data(), length, lob_id))) {
-          LOG_WARN("failed to insert a lob");
-          return rc;
+      if (field->type() == AttrType::LOBID) {
+        LobID lob_id{};
+        if (field->real_type() == AttrType::TEXT) {
+          size_t length = std::min(value.length(), TEXT_MAX_SIZE);
+          if (OB_FAIL(rc = lob_manager_->insert_lob(value.data(), length, lob_id))) {
+            LOG_WARN("failed to insert a lob");
+            break;
+          }
+          real_value.set_lob_id(lob_id);
+          LOG_DEBUG("make a lob record for text");
+        } else if (field->real_type() == AttrType::VECTORS) {
+          if (value.attr_type() == AttrType::CHARS) {
+            Value vector_val;
+            if (OB_FAIL(rc = Value::cast_to(value, AttrType::VECTORS, vector_val))) {
+              break;
+            }
+            if (vector_val.length() != field->real_len()) {
+              rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
+              break;
+            }
+            size_t length = vector_val.length();
+            if (OB_FAIL(rc = lob_manager_->insert_lob(vector_val.data(), length, lob_id))) {
+              LOG_WARN("failed to insert a lob");
+              break;
+            }
+            real_value.set_lob_id(lob_id);
+            LOG_DEBUG("make a lob record for vector");
+          }
+          else if (value.attr_type() == AttrType::VECTORS) {
+            if (value.length() != field->real_len()) {
+              rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
+              break;
+            }
+            size_t length = value.length();
+            if (OB_FAIL(rc = lob_manager_->insert_lob(value.data(), length, lob_id))) {
+              LOG_WARN("failed to insert a lob");
+              break;
+            }
+            real_value.set_lob_id(lob_id);
+            LOG_DEBUG("make a lob record for vector");
+          }
+          else {
+            rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
+            break;
+          }
         }
-        real_value.set_lob_id(lob_id);
-        LOG_DEBUG("make a lob record");
       } else {
         rc = Value::cast_to(value, field->type(), real_value);
         if (OB_FAIL(rc)) {
           LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
-              table_meta_->name(), field->name(), value.to_string().c_str());
+                table_meta_->name(), field->name(), value.to_string().c_str());
           break;
         }
       }
       rc = set_value_to_record(record_data, real_value, field);
     } else {
+      if (field->type() == AttrType::VECTORS && value.length() != field->len()) {
+        LOG_WARN("vector dimensions mismatch");
+        rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
+        break;
+      }
       rc = set_value_to_record(record_data, value, field);
     }
+
+    /* if (field->type() != value.attr_type()) {
+     *   Value real_value;
+     *   if (field->type() == AttrType::LOBID && value.attr_type() == AttrType::CHARS) {
+     *     LobID  lob_id{};
+     *     size_t length = std::min(value.length(), TEXT_MAX_SIZE);
+     *     if (OB_FAIL(rc = lob_manager_->insert_lob(value.data(), length, lob_id))) {
+     *       LOG_WARN("failed to insert a lob");
+     *       return rc;
+     *     }
+     *     real_value.set_lob_id(lob_id);
+     *     LOG_DEBUG("make a lob record");
+     *   } else {
+     *     rc = Value::cast_to(value, field->type(), real_value);
+     *     if (OB_FAIL(rc)) {
+     *       LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
+     *           table_meta_->name(), field->name(), value.to_string().c_str());
+     *       break;
+     *     }
+     *   }
+     *   rc = set_value_to_record(record_data, real_value, field);
+     * } else {
+     *   if (field->type() == AttrType::VECTORS && field->len() > MAX_INLINE_VECTOR_SIZE) {
+     *     Value real_value;
+     *     if (field->len() != value.length()) {
+     *       LOG_WARN("vector dimensions mismatch");
+     *       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+     *     }
+     *     LobID  lob_id{};
+     *     size_t length = value.length();
+     *     if (OB_FAIL(rc = lob_manager_->insert_lob(value.data(), length, lob_id))) {
+     *       LOG_WARN("failed to insert a lob");
+     *       return rc;
+     *     }
+     *     real_value.set_lob_id(lob_id);
+     *     LOG_DEBUG("make a lob record for vector");
+     *   }
+     *   rc = set_value_to_record(record_data, value, field);
+     * } */
   }
   if (OB_FAIL(rc)) {
     LOG_WARN("failed to make record. table name:%s", table_meta_->name());
@@ -140,8 +221,8 @@ RC HeapTableEngine::insert_record(Record &record)
     return rc;
   }
 
-  vector<Index*> inserted_indexes;
-  for (Index* index: indexes_) {
+  vector<Index *> inserted_indexes;
+  for (Index *index : indexes_) {
     if (OB_FAIL(rc = index->insert_entry(record))) {
       break;
     }
@@ -153,7 +234,7 @@ RC HeapTableEngine::insert_record(Record &record)
   RC ret_rc = rc;
 
   // if insert failed, rollback it
-  for (Index* index: inserted_indexes) {
+  for (Index *index : inserted_indexes) {
     if (OB_FAIL(rc = index->delete_entry(record))) {
       LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
                 table_meta_->name(), rc, strrc(rc));
@@ -221,17 +302,18 @@ RC HeapTableEngine::delete_record(const Record &record)
   return rc;
 }
 
-RC HeapTableEngine::update_record_with_trx(const Record &old_record, const Record &new_record, Trx *trx) {
+RC HeapTableEngine::update_record_with_trx(const Record &old_record, const Record &new_record, Trx *trx)
+{
   RC rc = RC::SUCCESS;
-  for (Index *index: indexes_) {
+  for (Index *index : indexes_) {
     rc = index->delete_entry(old_record);
     ASSERT(RC::SUCCESS == rc, 
            "failed to delete entry from index. table name=%s, index name=%s, rid=%s, rc=%s",
            table_meta_->name(), index->index_meta().name(), old_record.rid().to_string().c_str(), strrc(rc));
   }
 
-  vector<Index*> inserted_indexes;
-  for (Index* index: indexes_) {
+  vector<Index *> inserted_indexes;
+  for (Index *index : indexes_) {
     if (OB_FAIL(rc = index->insert_entry(new_record))) {
       break;
     }
@@ -240,7 +322,7 @@ RC HeapTableEngine::update_record_with_trx(const Record &old_record, const Recor
   // if insert to index failed, rollback it
   if (OB_FAIL(rc)) {
     RC rc2 = RC::SUCCESS;
-    for (Index* index: inserted_indexes) {
+    for (Index *index : inserted_indexes) {
       if (OB_FAIL(rc2 = index->delete_entry(new_record))) {
         LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
             table_meta_->name(), rc2, strrc(rc2));
@@ -250,10 +332,10 @@ RC HeapTableEngine::update_record_with_trx(const Record &old_record, const Recor
     return rc;
   }
 
-  rc = record_handler_->visit_record(old_record.rid(), [&new_record](Record& record) -> bool {
-      record = new_record;
-      return true;
-      });
+  rc = record_handler_->visit_record(old_record.rid(), [&new_record](Record &record) -> bool {
+    record = new_record;
+    return true;
+  });
 
   return rc;
 }
@@ -277,10 +359,7 @@ RC HeapTableEngine::get_chunk_scanner(ChunkFileScanner &scanner, Trx *trx, ReadW
   return rc;
 }
 
-RC HeapTableEngine::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name)
-{
-  return RC::SUCCESS;
-}
+RC HeapTableEngine::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name) { return RC::SUCCESS; }
 
 RC HeapTableEngine::create_index(Trx *trx, const vector<FieldMeta> field_metas, const char *index_name)
 {
@@ -381,7 +460,8 @@ RC HeapTableEngine::create_index(Trx *trx, const vector<FieldMeta> field_metas, 
   return rc;
 }
 
-RC HeapTableEngine::create_index(Trx *trx, const vector<FieldMeta> field_metas, const char *index_name, bool is_unique) {
+RC HeapTableEngine::create_index(Trx *trx, const vector<FieldMeta> field_metas, const char *index_name, bool is_unique)
+{
   if (common::is_blank(index_name) || field_metas.empty()) {
     LOG_INFO("Invalid input arguments, table name is %s, index_name is blank or attribute_name is blank", table_meta_->name());
     return RC::INVALID_ARGUMENT;

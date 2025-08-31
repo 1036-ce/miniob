@@ -25,9 +25,9 @@ enum class AttrType
   DATES,     ///< date类型
   BITMAP,    ///< bitmap类型
   TEXT,      ///< text类型
+  LOBID,     ///< Lobid 类型，用于大对象的存储
   MAXTYPE,   ///< 请在 UNDEFINED 与 MAXTYPE 之间增加新类型
 };
 
 const char *attr_type_to_string(AttrType type);
 AttrType    attr_type_from_string(const char *s);
-bool        is_lob_type(AttrType type);

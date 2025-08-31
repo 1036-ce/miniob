@@ -164,7 +164,7 @@ void Value::set_data(char *data, int length)
       value_.int_value_ = *(int *)data;
       length_           = length;
     } break;
-    case AttrType::TEXT: {
+    case AttrType::LOBID: {
       value_.lob_id_value_ = *(LobID *)data;
       length_              = length;
     } break;
@@ -501,7 +501,7 @@ bool Value::get_boolean() const
 
 LobID Value::get_lob_id() const
 {
-  ASSERT(attr_type_ == AttrType::TEXT, "attr_type_ must be TEXT");
+  ASSERT(attr_type_ == AttrType::LOBID, "attr_type_ must be LOBID");
   return value_.lob_id_value_;
 }
 

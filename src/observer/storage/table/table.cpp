@@ -223,7 +223,10 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
 
 bool Table::has_lob_type(span<const AttrInfoSqlNode> attributes) {
   for (auto attr: attributes) {
-    if (is_lob_type(attr.type)) {
+    if (attr.type == AttrType::TEXT) {
+      return true;
+    }
+    if (attr.type == AttrType::VECTORS && attr.length > MAX_INLINE_VECTOR_SIZE) {
       return true;
     }
   }

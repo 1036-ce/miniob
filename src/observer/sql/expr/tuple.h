@@ -173,7 +173,7 @@ public:
 
   void set_schema(const Table *table, const vector<FieldMeta> *fields)
   {
-    table_ = table;
+    table_          = table;
     table_ref_name_ = table->name();
     // fix:join当中会多次调用右表的open,open当中会调用set_scheme，从而导致tuple当中会存储
     // 很多无意义的field和value，因此需要先clear掉
@@ -187,9 +187,9 @@ public:
     }
   }
 
-  void set_schema(const Table *table, const vector<FieldMeta> *fields, const string& table_ref_name)
+  void set_schema(const Table *table, const vector<FieldMeta> *fields, const string &table_ref_name)
   {
-    table_ = table;
+    table_          = table;
     table_ref_name_ = table_ref_name;
     // fix:join当中会多次调用右表的open,open当中会调用set_scheme，从而导致tuple当中会存储
     // 很多无意义的field和value，因此需要先clear掉
@@ -212,10 +212,43 @@ public:
       return RC::INVALID_ARGUMENT;
     }
 
-    TableFieldExpr       *field_expr = speces_[index];
+    TableFieldExpr  *field_expr = speces_[index];
     const FieldMeta *field_meta = field_expr->field().meta();
     cell.reset();
-    if (field_meta->type() != AttrType::TEXT) {
+    if (field_meta->type() == AttrType::LOBID) {
+      Value lobid_val;
+      lobid_val.set_type(AttrType::LOBID);
+      lobid_val.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
+
+      if (field_meta->real_type() == AttrType::TEXT) {
+        char  *data = new char[TEXT_MAX_SIZE];
+        size_t size{};
+        table_->get_lob(lobid_val.get_lob_id(), data, size);
+        cell.set_type(AttrType::CHARS);
+        cell.set_data(data, size);
+        delete[] data;
+        if (field_meta->field_id() != NULL_BITMAP_FIELD_ID) {
+          cell.set_null(is_null_at(index));
+        }
+        return RC::SUCCESS;
+      } else if (field_meta->real_type() == AttrType::VECTORS) {
+        char  *data = new char[VECTOR_MAX_SIZE * sizeof(float)];
+        size_t size{};
+        table_->get_lob(lobid_val.get_lob_id(), data, size);
+        cell.set_type(AttrType::VECTORS);
+        cell.set_data(data, size);
+        delete[] data;
+        if (field_meta->field_id() != NULL_BITMAP_FIELD_ID) {
+          cell.set_null(is_null_at(index));
+        }
+        return RC::SUCCESS;
+      }
+      else {
+        LOG_WARN("not support type: %d", field_meta->real_type());
+        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+      }
+      return RC::SUCCESS;
+    } else {
       cell.set_type(field_meta->type());
       cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
       if (field_meta->field_id() != NULL_BITMAP_FIELD_ID) {
@@ -223,30 +256,53 @@ public:
       }
       return RC::SUCCESS;
     }
-    else {
-      // cell.set_int(1);
-      Value tmp;
-      tmp.set_type(field_meta->type());
-      tmp.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
-
-      char *data = new char[TEXT_MAX_SIZE];
-      size_t size{};
-      table_->get_lob(tmp.get_lob_id(), data, size); 
-      cell.set_type(AttrType::CHARS);
-      cell.set_data(data, size);
-      delete[] data;
-      if (field_meta->field_id() != NULL_BITMAP_FIELD_ID) {
-        cell.set_null(is_null_at(index));
-      }
-      return RC::SUCCESS;
-    } 
+    /*     if (field_meta->type() == AttrType::TEXT) {
+     *       Value tmp;
+     *       tmp.set_type(field_meta->type());
+     *       tmp.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
+     *
+     *       char *data = new char[TEXT_MAX_SIZE];
+     *       size_t size{};
+     *       table_->get_lob(tmp.get_lob_id(), data, size);
+     *       cell.set_type(AttrType::CHARS);
+     *       cell.set_data(data, size);
+     *       delete[] data;
+     *       if (field_meta->field_id() != NULL_BITMAP_FIELD_ID) {
+     *         cell.set_null(is_null_at(index));
+     *       }
+     *       return RC::SUCCESS;
+     *     }
+     *     else if (field_meta->type() == AttrType::VECTORS && field_meta->len() > MAX_INLINE_VECTOR_SIZE) {
+     *       Value tmp;
+     *       tmp.set_type(field_meta->type());
+     *       tmp.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
+     *
+     *       char *data = new char[VECTOR_MAX_SIZE * sizeof(float)];
+     *       size_t size{};
+     *       table_->get_lob(tmp.get_lob_id(), data, size);
+     *       cell.set_type(AttrType::VECTORS);
+     *       cell.set_data(data, size);
+     *       delete[] data;
+     *       if (field_meta->field_id() != NULL_BITMAP_FIELD_ID) {
+     *         cell.set_null(is_null_at(index));
+     *       }
+     *       return RC::SUCCESS;
+     *     }
+     *     else {
+     *       cell.set_type(field_meta->type());
+     *       cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
+     *       if (field_meta->field_id() != NULL_BITMAP_FIELD_ID) {
+     *         cell.set_null(is_null_at(index));
+     *       }
+     *       return RC::SUCCESS;
+     *     }  */
   }
 
   RC spec_at(int index, TupleCellSpec &spec) const override
   {
     const Field &field = speces_[index]->field();
     // spec               = TupleCellSpec(table_->name(), field.field_name());
-    spec               = TupleCellSpec(table_ref_name_.c_str(), field.field_name());
+    spec = TupleCellSpec(table_ref_name_.c_str(), field.field_name());
     return RC::SUCCESS;
   }
 
@@ -261,7 +317,7 @@ public:
 
     for (size_t i = 0; i < speces_.size(); ++i) {
       const TableFieldExpr *field_expr = speces_[i];
-      const Field     &field      = field_expr->field();
+      const Field          &field      = field_expr->field();
       if (0 == strcmp(field_name, field.field_name())) {
         return cell_at(i, cell);
       }
@@ -286,13 +342,13 @@ public:
   const Record &record() const { return *record_; }
 
 private:
-
-  bool is_null_at(int index) const {
+  bool is_null_at(int index) const
+  {
     // get `__null_bimap` field
     Value null_bitmap_val(false);
-    int null_bitmap_field_index = -1;
-    for (const auto& spece: speces_) {
-      const auto& field_meta = spece->field().meta();
+    int   null_bitmap_field_index = -1;
+    for (const auto &spece : speces_) {
+      const auto &field_meta = spece->field().meta();
       ++null_bitmap_field_index;
       if (field_meta->field_id() == NULL_BITMAP_FIELD_ID) {
         null_bitmap_val.set_bitmap(this->record_->data() + field_meta->offset(), field_meta->len());
@@ -310,9 +366,9 @@ private:
     return null_bitmap.get_bit(index - null_bitmap_field_index - 1);
   }
 
-  Record             *record_ = nullptr;
-  const Table        *table_  = nullptr;
-  string table_ref_name_;
+  Record                  *record_ = nullptr;
+  const Table             *table_  = nullptr;
+  string                   table_ref_name_;
   vector<TableFieldExpr *> speces_;
 };
 
