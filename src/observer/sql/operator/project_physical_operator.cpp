@@ -19,8 +19,8 @@ See the Mulan PSL v2 for more details. */
 
 using namespace std;
 
-ProjectPhysicalOperator::ProjectPhysicalOperator(vector<unique_ptr<Expression>> &&expressions)
-    : expressions_(std::move(expressions)), tuple_(expressions_)
+ProjectPhysicalOperator::ProjectPhysicalOperator(vector<unique_ptr<Expression>> &&expressions, int limit)
+    : expressions_(std::move(expressions)), tuple_(expressions_), limit_(limit)
 {}
 
 RC ProjectPhysicalOperator::open(Trx *trx)
@@ -36,6 +36,7 @@ RC ProjectPhysicalOperator::open(Trx *trx)
     return rc;
   }
 
+  emit_cnt_ = 0;
   return RC::SUCCESS;
 }
 
@@ -44,6 +45,10 @@ RC ProjectPhysicalOperator::next()
   if (children_.empty()) {
     return RC::RECORD_EOF;
   }
+  if (emit_cnt_ == limit_) {
+    return RC::RECORD_EOF;
+  }
+  ++emit_cnt_;
   return children_[0]->next();
 }
 
@@ -62,24 +67,6 @@ Tuple *ProjectPhysicalOperator::current_tuple()
 
 RC ProjectPhysicalOperator::tuple_schema(TupleSchema &schema) const
 {
-  /*   set<string> table_names;
-   *   for (const unique_ptr<Expression> &expression : expressions_) {
-   *     if (expression->type() == ExprType::FIELD) {
-   *       auto field_expr = static_cast<FieldExpr*>(expression.get());
-   *       table_names.insert(field_expr->table_name());
-   *     }
-   *   }
-   *
-   *   for (const unique_ptr<Expression> &expression : expressions_) {
-   *     if (expression->type() == ExprType::FIELD && table_names.size() > 1) {
-   *       auto field_expr = static_cast<FieldExpr*>(expression.get());
-   *       schema.append_cell(field_expr->table_name(), field_expr->field_name());
-   *     }
-   *     else {
-   *       schema.append_cell(expression->name());
-   *     }
-   *   } */
-
   for (const unique_ptr<Expression> &expression : expressions_) {
     schema.append_cell(expression->name());
   }

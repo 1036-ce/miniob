@@ -80,6 +80,10 @@ struct RID
     static RID rid{numeric_limits<PageNum>::max(), numeric_limits<SlotNum>::max()};
     return &rid;
   }
+
+  static RID invalid_rid() {
+    return RID{-1, -1};
+  }
 };
 
 struct RIDHash

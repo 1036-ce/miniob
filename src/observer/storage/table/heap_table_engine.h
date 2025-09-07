@@ -39,6 +39,8 @@ public:
   RC create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name) override;
   RC create_index(Trx *trx, const vector<FieldMeta> field_metas, const char *index_name) override;
   RC create_index(Trx *trx, const vector<FieldMeta> field_metas, const char *index_name, bool is_unique) override;
+  RC create_vector_index(Trx *trx, const FieldMeta &field_meta, const char *index_name,
+      const unordered_map<string, string> &params) override;
   RC get_record_scanner(RecordScanner *&scanner, Trx *trx, ReadWriteMode mode) override;
   RC get_chunk_scanner(ChunkFileScanner &scanner, Trx *trx, ReadWriteMode mode) override;
   RC visit_record(const RID &rid, function<bool(Record &)> visitor) override;
@@ -46,8 +48,7 @@ public:
 
   Index *find_index(const char *index_name) const override;
   Index *find_index_by_field(const char *field_name) const override;
-  Index *find_best_match_index(
-      unique_ptr<Expression> &predicate, unique_ptr<Expression> &residual_predicate) const override;
+  Index *find_best_match_index(const TableGetLogicalOperator& oper) const override;
   RC open() override;
   // init_record_handler
   RC init() override;

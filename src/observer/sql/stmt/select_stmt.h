@@ -104,6 +104,7 @@ public:
   vector<unique_ptr<Expression>> &query_expressions() { return query_expressions_; }
   vector<unique_ptr<Expression>> &group_by() { return group_by_; }
   vector<unique_ptr<OrderBy>>    &order_by() { return order_by_; }
+  int limit() const { return limit_; }
 
 private:
   static auto get_data_source(Db *db, const string& name) -> DataSource;
@@ -117,4 +118,5 @@ private:
   vector<unique_ptr<Expression>> group_by_;
   FilterStmt                    *having_filter_stmt_ = nullptr;
   vector<unique_ptr<OrderBy>>    order_by_;
+  int limit_;
 };

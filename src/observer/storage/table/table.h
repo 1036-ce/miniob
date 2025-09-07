@@ -95,6 +95,8 @@ public:
   RC create_index(Trx *trx, const vector<FieldMeta>& field_metas, const char *index_name);
   RC create_index(Trx *trx, const vector<FieldMeta>& field_metas, const char *index_name, bool is_unique);
 
+  RC create_vector_index(Trx *trx, const FieldMeta& field_meta, const char *index_name, const unordered_map<string, string>& params);
+
   RC get_record_scanner(RecordScanner *&scanner, Trx *trx, ReadWriteMode mode);
 
   RC get_chunk_scanner(ChunkFileScanner &scanner, Trx *trx, ReadWriteMode mode);
@@ -127,7 +129,7 @@ private:
 public:
   Index *find_index(const char *index_name) const;
   Index *find_index_by_field(const char *field_name) const;
-  Index *find_best_match_index(const unique_ptr<Expression>& predicate, unique_ptr<Expression>& residual_predicate) const;
+  Index *find_best_match_index(const TableGetLogicalOperator& oper) const;
 
 private:
   Db       *db_ = nullptr;

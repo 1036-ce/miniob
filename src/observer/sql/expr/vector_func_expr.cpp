@@ -26,15 +26,15 @@ RC VectorFuncExpr::calc_value(const Value &left_value, const Value &right_value,
   RC rc = RC::SUCCESS;
 
   switch (func_type_) {
-    case Type::L2_DISTANCE: {
+    case VectorFuncType::L2_DISTANCE: {
       rc = VectorType{}.l2_distance(left_value, right_value, value);
     } break;
 
-    case Type::COSINE_DISTANCE: {
+    case VectorFuncType::COSINE_DISTANCE: {
       rc = VectorType{}.cosine_distance(left_value, right_value, value);
     } break;
 
-    case Type::INNER_PRODUCT: {
+    case VectorFuncType::INNER_PRODUCT: {
       rc = VectorType{}.inner_product(left_value, right_value, value);
     } break;
     default: {
@@ -82,15 +82,15 @@ RC VectorFuncExpr::to_computable()
   return RC::SUCCESS;
 }
 
-RC VectorFuncExpr::type_from_string(const char *type_str, Type &type)
+RC VectorFuncExpr::type_from_string(const char *type_str, VectorFuncType &type)
 {
   RC rc = RC::SUCCESS;
   if (0 == strcasecmp(type_str, "l2_distance")) {
-    type = Type::L2_DISTANCE;
+    type = VectorFuncType::L2_DISTANCE;
   } else if (0 == strcasecmp(type_str, "cosine_distance")) {
-    type = Type::COSINE_DISTANCE;
+    type = VectorFuncType::COSINE_DISTANCE;
   } else if (0 == strcasecmp(type_str, "inner_product")) {
-    type = Type::INNER_PRODUCT;
+    type = VectorFuncType::INNER_PRODUCT;
   } else {
     rc = RC::INVALID_ARGUMENT;
   }

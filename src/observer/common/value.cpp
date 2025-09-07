@@ -351,6 +351,14 @@ void Value::set_vector(const float *vec, int size)
   }
 }
 
+void Value::set_vector(int size, float init) {
+  reset();
+  own_data_ = true;
+  attr_type_ = AttrType::VECTORS;
+  length_ = sizeof(float) * size;
+  value_.vector_value_ = new vector<float>(size, init);
+}
+
 void Value::set_vector_from_other(const Value &other)
 {
   ASSERT(attr_type_ == AttrType::VECTORS, "attr type is not VECTORS");

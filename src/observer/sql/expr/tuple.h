@@ -256,46 +256,6 @@ public:
       }
       return RC::SUCCESS;
     }
-    /*     if (field_meta->type() == AttrType::TEXT) {
-     *       Value tmp;
-     *       tmp.set_type(field_meta->type());
-     *       tmp.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
-     *
-     *       char *data = new char[TEXT_MAX_SIZE];
-     *       size_t size{};
-     *       table_->get_lob(tmp.get_lob_id(), data, size);
-     *       cell.set_type(AttrType::CHARS);
-     *       cell.set_data(data, size);
-     *       delete[] data;
-     *       if (field_meta->field_id() != NULL_BITMAP_FIELD_ID) {
-     *         cell.set_null(is_null_at(index));
-     *       }
-     *       return RC::SUCCESS;
-     *     }
-     *     else if (field_meta->type() == AttrType::VECTORS && field_meta->len() > MAX_INLINE_VECTOR_SIZE) {
-     *       Value tmp;
-     *       tmp.set_type(field_meta->type());
-     *       tmp.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
-     *
-     *       char *data = new char[VECTOR_MAX_SIZE * sizeof(float)];
-     *       size_t size{};
-     *       table_->get_lob(tmp.get_lob_id(), data, size);
-     *       cell.set_type(AttrType::VECTORS);
-     *       cell.set_data(data, size);
-     *       delete[] data;
-     *       if (field_meta->field_id() != NULL_BITMAP_FIELD_ID) {
-     *         cell.set_null(is_null_at(index));
-     *       }
-     *       return RC::SUCCESS;
-     *     }
-     *     else {
-     *       cell.set_type(field_meta->type());
-     *       cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
-     *       if (field_meta->field_id() != NULL_BITMAP_FIELD_ID) {
-     *         cell.set_null(is_null_at(index));
-     *       }
-     *       return RC::SUCCESS;
-     *     }  */
   }
 
   RC spec_at(int index, TupleCellSpec &spec) const override

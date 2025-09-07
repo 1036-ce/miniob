@@ -1,4 +1,5 @@
 #include "sql/expr/expression.h"
+#include "common/type/vector_type.h"
 
 class UnboundVectorFuncExpr : public Expression
 {
@@ -36,18 +37,10 @@ private:
 class VectorFuncExpr : public Expression
 {
 public:
-  enum class Type
-  {
-    L2_DISTANCE,
-    COSINE_DISTANCE,
-    INNER_PRODUCT
-  };
-
-public:
-  VectorFuncExpr(Type type, Expression *left_child, Expression *right_child)
+  VectorFuncExpr(VectorFuncType type, Expression *left_child, Expression *right_child)
       : func_type_(type), left_child_(left_child), right_child_(right_child)
   {}
-  VectorFuncExpr(Type type, unique_ptr<Expression> left_child, unique_ptr<Expression> right_child)
+  VectorFuncExpr(VectorFuncType type, unique_ptr<Expression> left_child, unique_ptr<Expression> right_child)
       : func_type_(type), left_child_(std::move(left_child)), right_child_(std::move(right_child))
   {}
   virtual ~VectorFuncExpr() = default;
@@ -67,15 +60,15 @@ public:
 
   RC to_computable();
 
-  Type                    func_type() const { return func_type_; }
+  VectorFuncType                    func_type() const { return func_type_; }
   unique_ptr<Expression> &left_child() { return left_child_; }
   unique_ptr<Expression> &right_child() { return right_child_; }
 
 public:
-  static RC type_from_string(const char *type_str, Type &type);
+  static RC type_from_string(const char *type_str, VectorFuncType &type);
 
 private:
-  Type                   func_type_;
+  VectorFuncType                   func_type_;
   unique_ptr<Expression> left_child_;
   unique_ptr<Expression> right_child_;
 };

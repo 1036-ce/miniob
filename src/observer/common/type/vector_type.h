@@ -12,6 +12,13 @@ See the Mulan PSL v2 for more details. */
 
 #include "common/type/data_type.h"
 
+enum class VectorFuncType
+{
+  L2_DISTANCE,
+  COSINE_DISTANCE,
+  INNER_PRODUCT
+};
+
 /**
  * @brief 向量类型
  * @ingroup DataType
@@ -38,6 +45,7 @@ public:
   RC cosine_distance(const Value &left, const Value &right, Value &result) const;
   RC inner_product(const Value &left, const Value &right, Value &result) const;
 
+  static RC type_from_string(const char *type_str, VectorFuncType &type);
 private:
   RC str2float(const char *&pos, float &val) const;
 };

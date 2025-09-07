@@ -26,7 +26,7 @@ class TableGetLogicalOperator : public LogicalOperator
 {
 public:
   TableGetLogicalOperator(Table *table, ReadWriteMode mode);
-  TableGetLogicalOperator(Table *table, const string& table_ref_name, ReadWriteMode mode);
+  TableGetLogicalOperator(Table *table, const string &table_ref_name, ReadWriteMode mode);
   virtual ~TableGetLogicalOperator() = default;
 
   LogicalOperatorType type() const override { return LogicalOperatorType::TABLE_GET; }
@@ -53,11 +53,15 @@ public:
   unique_ptr<LogicalProperty> find_log_prop(const vector<LogicalProperty *> &log_props) override;
 
   Table        *table() const { return table_; }
-  const string& table_ref_name() const { return table_ref_name_; }
+  const string &table_ref_name() const { return table_ref_name_; }
   ReadWriteMode read_write_mode() const { return mode_; }
 
   void set_predicate(unique_ptr<Expression> &&exprs);
   auto predicate() -> unique_ptr<Expression> & { return predicate_; }
+  auto predicate() const -> const unique_ptr<Expression> & { return predicate_; }
+  auto orderby() -> unique_ptr<Expression> & { return orderby_; }
+  auto orderby() const -> const unique_ptr<Expression> & { return orderby_; }
+  auto limit() const -> int { return limit_; }
 
 private:
   Table        *table_ = nullptr;
@@ -69,4 +73,6 @@ private:
   // 不包含复杂的表达式运算，比如加减乘除、或者conjunction expression
   // 如果有多个表达式，他们的关系都是 AND
   unique_ptr<Expression> predicate_;
+  unique_ptr<Expression> orderby_;
+  int                    limit_ = -1; // -1表示无limit
 };

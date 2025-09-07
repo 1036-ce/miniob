@@ -275,3 +275,18 @@ RC VectorType::inner_product(const Value &left, const Value &right, Value &resul
   result.set_float(val);
   return RC::SUCCESS;
 }
+
+RC VectorType::type_from_string(const char *type_str, VectorFuncType &type)
+{
+  RC rc = RC::SUCCESS;
+  if (0 == strcasecmp(type_str, "l2_distance")) {
+    type = VectorFuncType::L2_DISTANCE;
+  } else if (0 == strcasecmp(type_str, "cosine_distance")) {
+    type = VectorFuncType::COSINE_DISTANCE;
+  } else if (0 == strcasecmp(type_str, "inner_product")) {
+    type = VectorFuncType::INNER_PRODUCT;
+  } else {
+    rc = RC::INVALID_ARGUMENT;
+  }
+  return rc;
+}

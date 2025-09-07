@@ -10,6 +10,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "storage/table/heap_table_engine.h"
 #include "common/config.h"
+#include "storage/index/ivfflat_index.h"
 #include "storage/record/heap_record_scanner.h"
 #include "common/log/log.h"
 #include "storage/index/bplus_tree_index.h"
@@ -559,6 +560,110 @@ RC HeapTableEngine::create_index(Trx *trx, const vector<FieldMeta> field_metas, 
   return rc;
 }
 
+RC HeapTableEngine::create_vector_index(Trx *trx, const FieldMeta &field_meta, const char *index_name,
+    const unordered_map<string, string> &params) {
+  if (common::is_blank(index_name)) {
+    LOG_INFO("Invalid input arguments, table name is %s, index_name is blank or attribute_name is blank", table_meta_->name());
+    return RC::INVALID_ARGUMENT;
+  }
+
+  IndexMeta new_index_meta;
+
+  RC rc = new_index_meta.init(index_name, {field_meta}, false);
+  if (rc != RC::SUCCESS) {
+    LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s", 
+             table_meta_->name(), index_name);
+    return rc;
+  }
+
+  // 创建索引相关数据
+  IvfflatIndex *index      = new IvfflatIndex();
+  string          index_file = table_index_file(db_->path().c_str(), table_meta_->name(), index_name);
+
+  rc = index->create(table_, index_file.c_str(), new_index_meta, field_meta, params);
+  if (rc != RC::SUCCESS) {
+    delete index;
+    LOG_ERROR("Failed to create bplus tree index. file name=%s, rc=%d:%s", index_file.c_str(), rc, strrc(rc));
+    return rc;
+  }
+
+  // 遍历当前的所有数据，插入这个索引
+  RecordScanner *scanner = nullptr;
+  rc                     = get_record_scanner(scanner, trx, ReadWriteMode::READ_ONLY);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to create scanner while creating index. table=%s, index=%s, rc=%s", 
+             table_meta_->name(), index_name, strrc(rc));
+    return rc;
+  }
+
+  Record record;
+  while (OB_SUCC(rc = scanner->next(record))) {
+    rc = index->insert_entry(record);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to insert record into index while creating index. table=%s, index=%s, rc=%s",
+               table_meta_->name(), index_name, strrc(rc));
+      return rc;
+    }
+  }
+  if (RC::RECORD_EOF == rc) {
+    rc = RC::SUCCESS;
+  } else {
+    LOG_WARN("failed to insert record into index while creating index. table=%s, index=%s, rc=%s",
+             table_meta_->name(), index_name, strrc(rc));
+    return rc;
+  }
+  scanner->close_scan();
+  delete scanner;
+  LOG_INFO("inserted all records into new index. table=%s, index=%s", table_meta_->name(), index_name);
+  if (OB_FAIL(rc = index->kmeans_train())) {
+    LOG_WARN("vector index train failed. rc = %s", index_name);
+    return rc;
+  }
+
+  indexes_.push_back(index);
+
+  /// 接下来将这个索引放到表的元数据中
+/*   TableMeta new_table_meta(*table_meta_);
+ *   rc = new_table_meta.add_index(new_index_meta);
+ *   if (rc != RC::SUCCESS) {
+ *     LOG_ERROR("Failed to add index (%s) on table (%s). error=%d:%s", index_name, table_meta_->name(), rc, strrc(rc));
+ *     return rc;
+ *   }
+ * 
+ *   /// 内存中有一份元数据，磁盘文件也有一份元数据。修改磁盘文件时，先创建一个临时文件，写入完成后再rename为正式文件
+ *   /// 这样可以防止文件内容不完整
+ *   // 创建元数据临时文件
+ *   string  tmp_file = table_meta_file(db_->path().c_str(), table_meta_->name()) + ".tmp";
+ *   fstream fs;
+ *   fs.open(tmp_file, ios_base::out | ios_base::binary | ios_base::trunc);
+ *   if (!fs.is_open()) {
+ *     LOG_ERROR("Failed to open file for write. file name=%s, errmsg=%s", tmp_file.c_str(), strerror(errno));
+ *     return RC::IOERR_OPEN;  // 创建索引中途出错，要做还原操作
+ *   }
+ *   if (new_table_meta.serialize(fs) < 0) {
+ *     LOG_ERROR("Failed to dump new table meta to file: %s. sys err=%d:%s", tmp_file.c_str(), errno, strerror(errno));
+ *     return RC::IOERR_WRITE;
+ *   }
+ *   fs.close();
+ * 
+ *   // 覆盖原始元数据文件
+ *   string meta_file = table_meta_file(db_->path().c_str(), table_meta_->name());
+ * 
+ *   int ret = rename(tmp_file.c_str(), meta_file.c_str());
+ *   if (ret != 0) {
+ *     LOG_ERROR("Failed to rename tmp meta file (%s) to normal meta file (%s) while creating index (%s) on table (%s). "
+ *               "system error=%d:%s",
+ *               tmp_file.c_str(), meta_file.c_str(), index_name, table_meta_->name(), errno, strerror(errno));
+ *     return RC::IOERR_WRITE;
+ *   }
+ * 
+ *   table_meta_->swap(new_table_meta); */
+
+  LOG_INFO("Successfully added a new index (%s) on the table (%s)", index_name, table_meta_->name());
+  return rc;
+
+}
+
 RC HeapTableEngine::insert_entry_of_indexes(const char *record, const RID &rid)
 {
   RC rc = RC::SUCCESS;
@@ -652,25 +757,17 @@ Index *HeapTableEngine::find_index_by_field(const char *field_name) const
   return nullptr;
 }
 
-Index *HeapTableEngine::find_best_match_index(
-    unique_ptr<Expression> &predicate, unique_ptr<Expression> &residual_predicate) const
-{
-  vector<unique_ptr<Expression> *> exprs;
-
-  if (predicate->type() == ExprType::CONJUNCTION) {
-    ConjunctionExpr *conjunction_expr = static_cast<ConjunctionExpr *>(predicate.get());
-    exprs                             = conjunction_expr->flatten(ExprType::COMPARISON);
-  } else if (predicate->type() == ExprType::COMPARISON) {
-    exprs.push_back(&predicate);
-  } else {
-    LOG_WARN("Predicate must be COMPARISON or CONJUNCTION");
-    return nullptr;
+Index *HeapTableEngine::find_best_match_index(const TableGetLogicalOperator& oper) const {
+  Index *ret = nullptr;
+  float max_score = 0.0;
+  for (auto index: indexes_) {
+    float score = index->get_match_score(oper);
+    if (max_score < score) {
+      max_score = score;
+      ret = index;
+    }
   }
-
-  /* for (auto index: indexes_) {
-   * } */
-
-  return nullptr;
+  return ret;
 }
 
 RC HeapTableEngine::init()

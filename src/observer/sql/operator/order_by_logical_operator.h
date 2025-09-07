@@ -15,7 +15,7 @@ See the Mulan PSL v2 for more details. */
 class OrderByLogicalOperator : public LogicalOperator
 {
 public:
-  OrderByLogicalOperator(vector<unique_ptr<OrderBy>> orderbys): orderbys_(std::move(orderbys)) {}
+  OrderByLogicalOperator(vector<unique_ptr<OrderBy>> orderbys, int limit = -1): orderbys_(std::move(orderbys)), limit_(limit) {}
 
   virtual ~OrderByLogicalOperator() = default;
 
@@ -23,7 +23,9 @@ public:
   OpType              get_op_type() const override { return OpType::LOGICALORDERBY; }
 
   vector<unique_ptr<OrderBy>>& orderbys() { return orderbys_; }
+  int limit() const { return limit_; }
 
 private:
   vector<unique_ptr<OrderBy>> orderbys_;
+  int limit_ = -1;
 };

@@ -22,6 +22,7 @@ class RecordScanner;
 class ChunkFileScanner;
 class ConditionFilter;
 class DefaultConditionFilter;
+class TableGetLogicalOperator;
 class Index;
 class IndexScanner;
 class RecordDeleter;
@@ -55,14 +56,20 @@ public:
   {
     return RC::UNSUPPORTED;
   }
+
+  virtual RC create_vector_index(
+      Trx *trx, const FieldMeta &field_meta, const char *index_name, const unordered_map<string, string> &params)
+  {
+    return RC::UNSUPPORTED;
+  }
+
   virtual RC     get_record_scanner(RecordScanner *&scanner, Trx *trx, ReadWriteMode mode)  = 0;
   virtual RC     get_chunk_scanner(ChunkFileScanner &scanner, Trx *trx, ReadWriteMode mode) = 0;
   virtual RC     visit_record(const RID &rid, function<bool(Record &)> visitor)             = 0;
   virtual RC     sync()                                                                     = 0;
   virtual Index *find_index(const char *index_name) const                                   = 0;
   virtual Index *find_index_by_field(const char *field_name) const                          = 0;
-  virtual Index *find_best_match_index(
-      unique_ptr<Expression> &predicate, unique_ptr<Expression> &residual_predicate) const
+  virtual Index *find_best_match_index(const TableGetLogicalOperator& oper) const
   {
     return nullptr;
   }

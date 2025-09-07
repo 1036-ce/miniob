@@ -48,6 +48,10 @@ public:
 
   int get_match_score(unique_ptr<Expression>& predicate, unique_ptr<Expression>& residual_predicate) override;
 
+  float get_match_score(const TableGetLogicalOperator& oper) override;
+
+  unique_ptr<PhysicalOperator> gen_physical_oper(const TableGetLogicalOperator& oper) override;
+
   RC sync() override;
 
 private:

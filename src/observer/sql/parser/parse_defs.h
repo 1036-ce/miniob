@@ -139,10 +139,10 @@ struct SelectSqlNode
 {
   vector<unique_ptr<Expression>> expressions;  ///< 查询的表达式
   unique_ptr<UnboundTable>       table_refs;
-  // vector<unique_ptr<Expression>> group_by;     ///< group by clause
   unique_ptr<GroupBy>         group_by;
   unique_ptr<Expression>      condition;  ///< 查询条件
   vector<unique_ptr<OrderBy>> order_by;
+  int limit;
 };
 
 /**
@@ -274,6 +274,25 @@ struct CreateIndexSqlNode
   bool           is_unique;
 };
 
+struct Param
+{
+  string key;
+  string value;
+};
+
+/**
+ * @brief 描述一个create vector index语句
+ * @ingroup SQLParser
+ * @details 创建索引时，需要指定索引名，表名，字段名以及构建向量索引的参数列表
+ */
+struct CreateVectorIndexSqlNode
+{
+  string                    index_name;     ///< Index name
+  string                    relation_name;  ///< Relation name
+  string                    attr_name;      ///< Attribute name
+  vector<unique_ptr<Param>> param_list;     ///< Param list
+};
+
 /**
  * @brief 描述一个drop index语句
  * @ingroup SQLParser
@@ -359,6 +378,7 @@ enum SqlCommandFlag
   SCF_DROP_TABLE,
   SCF_ANALYZE_TABLE,
   SCF_CREATE_INDEX,
+  SCF_CREATE_VECTOR_INDEX,
   SCF_DROP_INDEX,
   SCF_SYNC,
   SCF_SHOW_TABLES,
@@ -380,23 +400,24 @@ enum SqlCommandFlag
 class ParsedSqlNode
 {
 public:
-  enum SqlCommandFlag flag;
-  ErrorSqlNode        error;
-  CalcSqlNode         calc;
-  SelectSqlNode       selection;
-  InsertSqlNode       insertion;
-  DeleteSqlNode       deletion;
-  UpdateSqlNode       update;
-  CreateViewSqlNode   create_view;
-  CreateTableSqlNode  create_table;
-  DropTableSqlNode    drop_table;
-  AnalyzeTableSqlNode analyze_table;
-  CreateIndexSqlNode  create_index;
-  DropIndexSqlNode    drop_index;
-  DescTableSqlNode    desc_table;
-  LoadDataSqlNode     load_data;
-  ExplainSqlNode      explain;
-  SetVariableSqlNode  set_variable;
+  enum SqlCommandFlag      flag;
+  ErrorSqlNode             error;
+  CalcSqlNode              calc;
+  SelectSqlNode            selection;
+  InsertSqlNode            insertion;
+  DeleteSqlNode            deletion;
+  UpdateSqlNode            update;
+  CreateViewSqlNode        create_view;
+  CreateTableSqlNode       create_table;
+  DropTableSqlNode         drop_table;
+  AnalyzeTableSqlNode      analyze_table;
+  CreateIndexSqlNode       create_index;
+  CreateVectorIndexSqlNode create_vector_index;
+  DropIndexSqlNode         drop_index;
+  DescTableSqlNode         desc_table;
+  LoadDataSqlNode          load_data;
+  ExplainSqlNode           explain;
+  SetVariableSqlNode       set_variable;
 
 public:
   ParsedSqlNode();

@@ -24,7 +24,7 @@ See the Mulan PSL v2 for more details. */
 class ProjectPhysicalOperator : public PhysicalOperator
 {
 public:
-  ProjectPhysicalOperator(vector<unique_ptr<Expression>> &&expressions);
+  ProjectPhysicalOperator(vector<unique_ptr<Expression>> &&expressions, int limit = -1);
 
   virtual ~ProjectPhysicalOperator() = default;
 
@@ -52,4 +52,7 @@ public:
 private:
   vector<unique_ptr<Expression>>          expressions_;
   ExpressionTuple<unique_ptr<Expression>> tuple_;
+
+  int emit_cnt_ = 0;
+  int limit_ = -1;
 };

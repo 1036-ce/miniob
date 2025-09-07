@@ -137,6 +137,8 @@ LIKE                                    RETURN_TOKEN(LIKE_T);
 AS                                      RETURN_TOKEN(AS_T);
 HAVING                                  RETURN_TOKEN(HAVING_T);
 UNIQUE                                  RETURN_TOKEN(UNIQUE_T);
+WITH                                    RETURN_TOKEN(WITH_T);
+LIMIT                                   RETURN_TOKEN(LIMIT_T);
 {ID}                                    yylval->cstring=strdup(yytext); static_cast<std::vector<char*>*>(yyextra)->push_back(yylval->cstring); RETURN_TOKEN(ID);
 "("                                     RETURN_TOKEN(LBRACE);
 ")"                                     RETURN_TOKEN(RBRACE);

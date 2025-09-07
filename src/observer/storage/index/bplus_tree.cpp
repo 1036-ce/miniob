@@ -1719,54 +1719,6 @@ BplusTreeHandler::Iterator BplusTreeHandler::find_right_bound(BplusTreeMiniTrans
   return Iterator{this, leaf_frame, index};
 }
 
-
-/* RC BplusTreeHandler::insert_entry(const char *user_key, const RID *rid)
- * {
- *   if (user_key == nullptr || rid == nullptr) {
- *     LOG_WARN("Invalid arguments, key is empty or rid is empty");
- *     return RC::INVALID_ARGUMENT;
- *   }
- * 
- *   MemPoolItem::item_unique_ptr pkey = make_key(user_key, *rid);
- *   if (pkey == nullptr) {
- *     LOG_WARN("Failed to alloc memory for key.");
- *     return RC::NOMEM;
- *   }
- * 
- *   RC rc = RC::SUCCESS;
- * 
- *   BplusTreeMiniTransaction mtr(*this, &rc);
- * 
- *   char *key = static_cast<char *>(pkey.get());
- * 
- *   if (is_empty()) {
- *     root_lock_.lock();
- *     if (is_empty()) {
- *       rc = create_new_tree(mtr, key, rid);
- *       root_lock_.unlock();
- *       return rc;
- *     }
- *     root_lock_.unlock();
- *   }
- * 
- *   Frame *frame = nullptr;
- * 
- *   rc = find_leaf(mtr, BplusTreeOperationType::INSERT, key, frame);
- *   if (OB_FAIL(rc)) {
- *     LOG_WARN("Failed to find leaf %s. rc=%d:%s", rid->to_string().c_str(), rc, strrc(rc));
- *     return rc;
- *   }
- * 
- *   rc = insert_entry_into_leaf_node(mtr, frame, key, rid);
- *   if (OB_FAIL(rc)) {
- *     LOG_TRACE("Failed to insert into leaf of index, rid:%s. rc=%s", rid->to_string().c_str(), strrc(rc));
- *     return rc;
- *   }
- * 
- *   LOG_TRACE("insert entry success");
- *   return RC::SUCCESS;
- * } */
-
 RC BplusTreeHandler::insert_entry(const vector<Value>& values, const RID *rid)
 {
   MemPoolItem::item_unique_ptr pkey = make_key(values, *rid);

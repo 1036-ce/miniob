@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/log/log.h"
 #include "sql/expr/expression.h"
 #include "session/session.h"
+#include "storage/index/index.h"
 #include "sql/expr/subquery_expression.h"
 #include "sql/operator/aggregate_vec_physical_operator.h"
 #include "sql/operator/calc_logical_operator.h"
@@ -146,85 +147,18 @@ RC PhysicalPlanGenerator::create_vec(
 RC PhysicalPlanGenerator::create_plan(
     TableGetLogicalOperator &table_get_oper, unique_ptr<PhysicalOperator> &oper, Session *session)
 {
-  unique_ptr<Expression>          &predicate = table_get_oper.predicate();
-  vector<unique_ptr<Expression> *> exprs;
-
-  if (predicate) {
-    if (predicate->type() == ExprType::CONJUNCTION) {
-      ConjunctionExpr *conjunction_expr = static_cast<ConjunctionExpr *>(predicate.get());
-      exprs                             = conjunction_expr->flatten(ExprType::COMPARISON);
-    } else if (predicate->type() == ExprType::COMPARISON) {
-      exprs.push_back(&predicate);
-    } else {
-      LOG_WARN("Predicate must be COMPARISON or CONJUNCTION");
-      return RC::UNSUPPORTED;
-    }
-  }
-
-  // 看看是否有可以用于索引查找的表达式
-  Table     *table      = table_get_oper.table();
-  Index     *index      = nullptr;
-  ValueExpr *value_expr = nullptr;
-
-  for (auto expr : exprs) {
-    if ((*expr)->type() == ExprType::COMPARISON) {
-      auto comparison_expr = static_cast<ComparisonExpr *>(expr->get());
-      // 简单处理，就找等值查询
-      if (comparison_expr->comp() != EQUAL_TO) {
-        continue;
-      }
-
-      unique_ptr<Expression> &left_expr  = comparison_expr->left();
-      unique_ptr<Expression> &right_expr = comparison_expr->right();
-      // 左右比较的一边最少是一个值
-      if (left_expr->type() != ExprType::VALUE && right_expr->type() != ExprType::VALUE) {
-        continue;
-      }
-
-      TableFieldExpr *field_expr = nullptr;
-      if (left_expr->type() == ExprType::TABLE_FIELD) {
-        ASSERT(right_expr->type() == ExprType::VALUE, "right expr should be a value expr while left is field expr");
-        field_expr = static_cast<TableFieldExpr *>(left_expr.get());
-        value_expr = static_cast<ValueExpr *>(right_expr.get());
-      } else if (right_expr->type() == ExprType::TABLE_FIELD) {
-        ASSERT(left_expr->type() == ExprType::VALUE, "left expr should be a value expr while right is a field expr");
-        field_expr = static_cast<TableFieldExpr *>(right_expr.get());
-        value_expr = static_cast<ValueExpr *>(left_expr.get());
-      }
-
-      if (field_expr == nullptr) {
-        continue;
-      }
-
-      const Field &field = field_expr->field();
-      index              = table->find_index_by_field(field.field_name());
-      if (nullptr != index) {
-        break;
-      }
-    }
-  }
+  Table *table = table_get_oper.table();
+  Index* index = table->find_best_match_index(table_get_oper);
 
   if (index != nullptr) {
-    ASSERT(value_expr != nullptr, "got an index but value expr is null ?");
-
-    const Value               &value           = value_expr->get_value();
-    IndexScanPhysicalOperator *index_scan_oper = new IndexScanPhysicalOperator(table,
-        index,
-        table_get_oper.read_write_mode(),
-        &value,
-        true /*left_inclusive*/,
-        &value,
-        true /*right_inclusive*/);
-
-    index_scan_oper->set_predicate(std::move(predicate));
-    oper = unique_ptr<PhysicalOperator>(index_scan_oper);
+    oper = index->gen_physical_oper(table_get_oper);
     LOG_TRACE("use index scan");
   } else {
-    // auto table_scan_oper = new TableScanPhysicalOperator(table, table_get_oper.read_write_mode());
+    auto& predicate = table_get_oper.predicate();
     auto table_scan_oper = new TableScanPhysicalOperator(table, table_get_oper.table_ref_name(),table_get_oper.read_write_mode());
     table_scan_oper->set_predicate(std::move(predicate));
     oper = unique_ptr<PhysicalOperator>(table_scan_oper);
-    LOG_TRACE("use table scan");
+    LOG_TRACE("use table scan"); 
   }
 
   return RC::SUCCESS;
@@ -328,7 +262,7 @@ RC PhysicalPlanGenerator::create_plan(
     }
   }
 
-  auto project_operator = make_unique<ProjectPhysicalOperator>(std::move(project_oper.expressions()));
+  auto project_operator = make_unique<ProjectPhysicalOperator>(std::move(project_oper.expressions()), project_oper.limit());
   if (child_phy_oper) {
     project_operator->add_child(std::move(child_phy_oper));
   }
@@ -531,7 +465,7 @@ RC PhysicalPlanGenerator::create_plan(
   ASSERT(logical_oper.children().size() == 1, "order by operator should have 1 child");
 
   vector<unique_ptr<OrderBy>>        &orderbys      = logical_oper.orderbys();
-  unique_ptr<OrderByPhysicalOperator> order_by_oper = make_unique<OrderByPhysicalOperator>(std::move(orderbys));
+  unique_ptr<OrderByPhysicalOperator> order_by_oper = make_unique<OrderByPhysicalOperator>(std::move(orderbys), logical_oper.limit());
 
   LogicalOperator             &child_oper = *logical_oper.children().front();
   unique_ptr<PhysicalOperator> child_physical_oper;

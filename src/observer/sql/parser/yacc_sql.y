@@ -148,6 +148,8 @@ SubQueryExpr *create_subquery_expression(const vector<Value>& value_list) {
         AS_T
         HAVING_T
         UNIQUE_T
+        WITH_T
+        LIMIT_T
         EQ
         LT
         GT
@@ -172,6 +174,8 @@ SubQueryExpr *create_subquery_expression(const vector<Value>& value_list) {
   vector<float> *                            number_list;
   Assignment *                               assignment;
   std::vector<unique_ptr<Assignment>> *      assignment_list;
+  Param *                                    param;
+  vector<unique_ptr<Param>> *                param_list;
   OrderBy*                                   order_by_entry;
   vector<unique_ptr<OrderBy>>*               order_by_list;
   GroupBy*                                   group_by;
@@ -193,6 +197,7 @@ SubQueryExpr *create_subquery_expression(const vector<Value>& value_list) {
 %type <value>               value
 %type <value_list>          value_list
 %type <number>              number
+%type <number>              limit_opt 
 %type <cstring>             relation
 %type <comp>                comp_op
 %type <comp>                in_opt
@@ -221,6 +226,8 @@ SubQueryExpr *create_subquery_expression(const vector<Value>& value_list) {
 %type <order_by_list>       order_by 
 %type <assignment>          assignment
 %type <assignment_list>     assignment_list
+%type <param>               param 
+%type <param_list>          param_list 
 %type <order_by_list>       order_by_list
 %type <order_by_entry>      order_by_entry
 %type <sql_node>            calc_stmt
@@ -236,6 +243,7 @@ SubQueryExpr *create_subquery_expression(const vector<Value>& value_list) {
 %type <sql_node>            show_tables_stmt
 %type <sql_node>            desc_table_stmt
 %type <sql_node>            create_index_stmt
+%type <sql_node>            create_vector_index_stmt
 %type <sql_node>            drop_index_stmt
 %type <sql_node>            sync_stmt
 %type <sql_node>            begin_stmt
@@ -275,6 +283,7 @@ command_wrapper:
   | show_tables_stmt
   | desc_table_stmt
   | create_index_stmt
+  | create_vector_index_stmt
   | drop_index_stmt
   | sync_stmt
   | begin_stmt
@@ -358,6 +367,52 @@ create_index_stmt:    /*create index 语句的语法解析树*/
       // create_index.attribute_name = $7;
       create_index.attr_names.swap(*$8);
       delete $8;
+    }
+    ;
+
+
+param:
+    ID EQ ID 
+    {
+      $$ = new Param();
+      $$->key = $1;
+      $$->value = $3;
+    }
+    | ID EQ NUMBER
+    {
+      $$ = new Param();
+      $$->key = $1;
+      $$->value = std::to_string($3);
+    }
+    ;
+
+param_list:
+    param 
+    {
+      $$ = new vector<unique_ptr<Param>>;
+      $$->emplace_back($1);
+    }
+    | param COMMA param_list 
+    {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new vector<unique_ptr<Param>>;
+      }
+      $$->emplace($$->begin(), $1);
+    }
+    ;
+
+create_vector_index_stmt:
+    CREATE VECTOR_T INDEX ID ON ID LBRACE ID RBRACE WITH_T LBRACE param_list RBRACE
+    {
+      $$ = new ParsedSqlNode(SCF_CREATE_VECTOR_INDEX);
+      CreateVectorIndexSqlNode &create_vector_index = $$->create_vector_index;
+      create_vector_index.index_name = $4;
+      create_vector_index.relation_name = $6;
+      create_vector_index.attr_name = $8;
+      create_vector_index.param_list.swap(*$12);
+      delete $12;
     }
     ;
 
@@ -493,6 +548,16 @@ attr_def:
 number:
     NUMBER {$$ = $1;}
     ;
+
+limit_opt:
+    {
+      $$ = -1;
+    }
+    | LIMIT_T number {
+      $$ = $2;
+    }
+    ;
+
 type:
     INT_T      { $$ = static_cast<int>(AttrType::INTS); }
     | STRING_T { $$ = static_cast<int>(AttrType::CHARS); }
@@ -692,7 +757,7 @@ update_stmt:      /*  update 语句的语法解析树*/
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM table_refs where group_by order_by
+    SELECT expression_list FROM table_refs where group_by order_by limit_opt
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -718,6 +783,8 @@ select_stmt:        /*  select 语句的语法解析树*/
         $$->selection.order_by.swap(*$7);
         delete $7;
       }
+
+      $$->selection.limit = $8;
     }
     ;
 

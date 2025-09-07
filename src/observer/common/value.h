@@ -228,6 +228,7 @@ public:
   void set_vector(const vector<float>& vec);
   void set_vector(vector<float>&& vec);
   void set_vector(const float* vec, int size);
+  void set_vector(int size, float init);
   void set_vector_from_other(const Value &other);
 
 private:

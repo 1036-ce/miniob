@@ -16,9 +16,10 @@ See the Mulan PSL v2 for more details. */
 
 using namespace std;
 
-ProjectLogicalOperator::ProjectLogicalOperator(vector<unique_ptr<Expression>> &&expressions)
+ProjectLogicalOperator::ProjectLogicalOperator(vector<unique_ptr<Expression>> &&expressions, int limit)
 {
   expressions_ = std::move(expressions);
+  limit_ = limit;
 }
 
 unique_ptr<LogicalProperty> ProjectLogicalOperator::find_log_prop(const vector<LogicalProperty*> &log_props)

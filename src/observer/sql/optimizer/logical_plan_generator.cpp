@@ -169,7 +169,7 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     last_oper = &order_by_oper;
   }
 
-  auto project_oper = make_unique<ProjectLogicalOperator>(std::move(select_stmt->query_expressions()));
+  auto project_oper = make_unique<ProjectLogicalOperator>(std::move(select_stmt->query_expressions()), select_stmt->limit());
   if (*last_oper) {
     project_oper->add_child(std::move(*last_oper));
   }
@@ -470,7 +470,7 @@ RC LogicalPlanGenerator::create_order_by_plan(SelectStmt *select_stmt, unique_pt
     logical_operator = nullptr;
     return RC::SUCCESS;
   }
-  auto order_by_oper = make_unique<OrderByLogicalOperator>(std::move(select_stmt->order_by()));
+  auto order_by_oper = make_unique<OrderByLogicalOperator>(std::move(select_stmt->order_by()), select_stmt->limit());
   logical_operator   = std::move(order_by_oper);
   return RC::SUCCESS;
 }

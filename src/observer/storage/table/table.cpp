@@ -256,13 +256,17 @@ RC Table::create_index(Trx *trx, const vector<FieldMeta>& field_metas, const cha
   return engine_->create_index(trx, field_metas, index_name, is_unique);
 }
 
+RC Table::create_vector_index(Trx *trx, const FieldMeta& field_meta, const char *index_name, const unordered_map<string, string>& params) {
+  return engine_->create_vector_index(trx, field_meta, index_name, params);
+}
+
 RC Table::delete_record(const Record &record) { return engine_->delete_record(record); }
 
 Index *Table::find_index(const char *index_name) const { return engine_->find_index(index_name); }
 Index *Table::find_index_by_field(const char *field_name) const { return engine_->find_index_by_field(field_name); }
 
-Index *Table::find_best_match_index(const unique_ptr<Expression>& predicate, unique_ptr<Expression>& residual_predicate) const {
-  return nullptr;
+Index *Table::find_best_match_index(const TableGetLogicalOperator& oper) const {
+  return engine_->find_best_match_index(oper);
 }
 
 RC Table::sync() { return engine_->sync(); }
