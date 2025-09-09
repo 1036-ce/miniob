@@ -31,6 +31,7 @@ RC VectorIndexScanPhysicalOperator::next()
     return rc;
   }
   tuple_.set_record(&current_record_);
+  ++idx_;
   return RC::SUCCESS;
 }
 

@@ -36,6 +36,7 @@ RC IvfflatIndex::create(Table *table, const char *file_name, const IndexMeta &in
 
   table_      = table;
   field_meta_ = field_meta;
+  index_meta_ = index_meta;
   return RC::SUCCESS;
 }
 
