@@ -12,7 +12,9 @@
 class VectorIndexScanPhysicalOperator : public PhysicalOperator
 {
 public:
-  VectorIndexScanPhysicalOperator(Table *table, IvfflatIndex *index);
+  VectorIndexScanPhysicalOperator(Table *table, IvfflatIndex *index, const Value &base_vector, int limit)
+      : table_(table), index_(index), base_vector_(base_vector), limit_(limit), table_ref_name_(table->name())
+  {}
 
   virtual ~VectorIndexScanPhysicalOperator() = default;
 
@@ -30,13 +32,11 @@ private:
   RC filter(RowTuple &tuple, bool &result);
 
 private:
-  Trx          *trx_   = nullptr;
   Table        *table_ = nullptr;
   IvfflatIndex *index_ = nullptr;
-
-  Value  base_vector_;
-  int    limit_;
-  string table_ref_name_;
+  Value         base_vector_;
+  int           limit_;
+  string        table_ref_name_;
 
   RowTuple    tuple_;
   Record      current_record_;

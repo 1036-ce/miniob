@@ -475,10 +475,16 @@ RC PhysicalPlanGenerator::create_plan(
     return rc;
   }
 
-  order_by_oper->add_child(std::move(child_physical_oper));
-
-  oper = std::move(order_by_oper);
-  return rc;
+  // 如果child为index_scan,说明orderby已被index吸收
+  if (child_physical_oper->type() == PhysicalOperatorType::VECTOR_INDEX_SCAN) {
+    oper = std::move(child_physical_oper);
+    return RC::SUCCESS;
+  }
+  else {
+    order_by_oper->add_child(std::move(child_physical_oper));
+    oper = std::move(order_by_oper);
+    return rc;
+  }
 }
 
 RC PhysicalPlanGenerator::create_plan(

@@ -1,5 +1,6 @@
 #include "storage/index/ivfflat_index.h"
 #include "sql/expr/vector_func_expr.h"
+#include "sql/operator/vector_index_scan_physical_operator.h"
 #include <random>
 
 static constexpr const string IVFFLAT_TYPE           = "ivfflat";
@@ -44,7 +45,13 @@ RC IvfflatIndex::open(Table *table, const char *file_name, const IndexMeta &inde
   return RC::SUCCESS;
 }
 
-vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, size_t limit) { 
+vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, int limit) { 
+
+  if (need_retrain()) {
+    RC rc = kmeans_train();
+    ASSERT(OB_SUCC(rc), "retrain must be success");
+  }
+
   Value base_val;
   base_val.set_vector(base_vector);
   auto center_comp = [this, &base_val](size_t lhs, size_t rhs) -> bool {
@@ -55,6 +62,12 @@ vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, size_t li
     return lhs_dist < rhs_dist;
   };
   auto value_comp = [this, &base_val](size_t lhs, size_t rhs) -> bool {
+    if (rids_.at(lhs) == RID::invalid_rid()) {
+      return false;
+    }
+    if (rids_.at(rhs) == RID::invalid_rid()) {
+      return true;
+    }
     float lhs_dist;
     float rhs_dist;
     distance(base_val, values_.at(lhs), lhs_dist);
@@ -63,7 +76,7 @@ vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, size_t li
   };
 
   std::priority_queue<size_t, vector<size_t>, decltype(center_comp)> center_idx_pq{center_comp};
-  for (int i = 0; i < lists_; ++i) {
+  for (size_t i = 0; i < centers_.size(); ++i) {
     if (center_idx_pq.size() < static_cast<size_t>(probes_)) {
       center_idx_pq.push(i);
     }
@@ -123,6 +136,7 @@ RC IvfflatIndex::insert_entry(const Record &record)
     return rc;
   }
   clusters_.at(center_idx).push_back(values_.size() - 1);
+  ++insert_num_after_train_;
   return RC::SUCCESS;
 }
 
@@ -133,6 +147,7 @@ RC IvfflatIndex::delete_entry(const Record &record)
       rid = RID::invalid_rid();
     }
   }
+  ++delete_num_after_train_;
   return RC::SUCCESS;
 }
 
@@ -168,6 +183,18 @@ RC IvfflatIndex::kmeans_init()
 RC IvfflatIndex::kmeans_train()
 {
   RC rc = RC::SUCCESS;
+
+  centers_.clear();
+  clusters_.clear();
+  remove_deleted();
+
+  if (values_.size() <= static_cast<size_t>(lists_)) {
+    centers_ = values_;
+    for (size_t i = 0; i < values_.size(); ++i) {
+      clusters_.push_back({i});
+    }
+    return RC::SUCCESS;
+  }
 
   if (OB_FAIL(rc = kmeans_init())) {
     return rc;
@@ -264,7 +291,30 @@ float IvfflatIndex::get_match_score(const TableGetLogicalOperator &oper)
 
 unique_ptr<PhysicalOperator> IvfflatIndex::gen_physical_oper(const TableGetLogicalOperator &oper) 
 {
-  return nullptr;
+  auto& orderby = oper.orderby();
+  if (orderby == nullptr || orderby->type() != ExprType::VECTOR_FUNC) {
+    return nullptr;
+  }
+
+  auto vec_func_expr = static_cast<VectorFuncExpr *>(orderby.get());
+  if (vec_func_expr->func_type() != func_type_) {
+    return nullptr;
+  }
+
+  ValueExpr *val_expr;
+  if (vec_func_expr->left_child()->type() == ExprType::VALUE) {
+    val_expr = static_cast<ValueExpr*>(vec_func_expr->left_child().get());
+  }
+  else if (vec_func_expr->right_child()->type() == ExprType::VALUE) {
+    val_expr = static_cast<ValueExpr*>(vec_func_expr->right_child().get());
+  }
+  else {
+    return nullptr;
+  }
+
+  Value base_vector = val_expr->get_value();
+
+  return make_unique<VectorIndexScanPhysicalOperator>(oper.table(), this, base_vector, oper.limit());
 }
 
 RC IvfflatIndex::str2int(const string &str, int &val)
@@ -351,4 +401,39 @@ int IvfflatIndex::choose(const vector<float> &dists, float rand)
     }
   }
   return dists.size() - 1;
+}
+
+void IvfflatIndex::remove_deleted() {
+  size_t size = rids_.size();
+  size_t pre = 0;
+  size_t cur = 0;
+
+  while (pre < size && rids_.at(pre) == RID::invalid_rid()) {
+    ++pre;
+    ++cur;
+  }
+
+  while (cur < size) {
+    if (rids_.at(cur) != RID::invalid_rid()) {
+      std::swap(rids_.at(pre), rids_.at(cur));
+      std::swap(values_.at(pre), values_.at(cur));
+      ++pre;
+    }
+    ++cur;
+  }
+
+  while (pre < size) {
+    rids_.pop_back();
+    values_.pop_back();
+    ++pre;
+  }
+}
+
+bool IvfflatIndex::need_retrain() {
+  float change_num = insert_num_after_train_ + delete_num_after_train_;
+  float total_size = static_cast<float>(std::max<int>(values_.size(), 1));
+  if (change_num / total_size > 0.2) {
+    return true;
+  }
+  return false;
 }

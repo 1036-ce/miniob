@@ -116,6 +116,12 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     LOG_WARN("failed to create table logical plan. rc=%s", strrc(rc));
     return rc;
   }
+  if (table_oper->type() == LogicalOperatorType::TABLE_GET && !select_stmt->order_by().empty()) {
+    auto table_get_oper = static_cast<TableGetLogicalOperator*>(table_oper.get());
+    auto orderby_expr = select_stmt->order_by().front()->expr->copy();
+    table_get_oper->set_orderby(std::move(orderby_expr));
+    table_get_oper->set_limit(select_stmt->limit());
+  }
 
   if (predicate_oper) {
     if (*last_oper) {

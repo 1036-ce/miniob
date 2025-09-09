@@ -30,7 +30,7 @@ public:
 
   bool is_vector_index() override { return true; }
 
-  vector<RID> ann_search(const vector<float> &base_vector, size_t limit);
+  vector<RID> ann_search(const vector<float> &base_vector, int limit);
 
   RC close() { return RC::SUCCESS; }
 
@@ -67,6 +67,8 @@ private:
   RC  distance(const Value &left, const Value &right, float &result);
   RC  get_nearest_center_distance(const Value &val, float &dist, int &center_idx);
   int choose(const vector<float> &dists, float rand);
+  void remove_deleted();
+  bool need_retrain();
 
   bool           trained_ = false;
   Table         *table_   = nullptr;
@@ -80,4 +82,7 @@ private:
 
   vector<Value>          centers_;
   vector<vector<size_t>> clusters_;
+
+  int insert_num_after_train_ = 0;
+  int delete_num_after_train_ = 0;
 };

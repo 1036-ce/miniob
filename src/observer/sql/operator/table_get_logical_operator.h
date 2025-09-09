@@ -59,8 +59,10 @@ public:
   void set_predicate(unique_ptr<Expression> &&exprs);
   auto predicate() -> unique_ptr<Expression> & { return predicate_; }
   auto predicate() const -> const unique_ptr<Expression> & { return predicate_; }
+  void set_orderby(unique_ptr<Expression> &&orderby) { orderby_ = std::move(orderby); }
   auto orderby() -> unique_ptr<Expression> & { return orderby_; }
   auto orderby() const -> const unique_ptr<Expression> & { return orderby_; }
+  void set_limit(int limit) { limit_ = limit; }
   auto limit() const -> int { return limit_; }
 
 private:

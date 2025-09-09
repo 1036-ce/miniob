@@ -8,6 +8,12 @@ string VectorIndexScanPhysicalOperator::param() const
 
 RC VectorIndexScanPhysicalOperator::open(Trx *trx)
 {
+  if (limit_ < 0) {
+    return RC::INVALID_ARGUMENT;
+  }
+  if (limit_ == 0) {
+    return RC::SUCCESS;
+  }
   rids_ = index_->ann_search(*base_vector_.get_vector(), limit_);
   idx_  = 0;
   tuple_.set_schema(table_, table_->table_meta().field_metas(), table_ref_name_);
