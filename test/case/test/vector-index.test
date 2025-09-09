@@ -1,0 +1,15 @@
+create table vt1 (id int, c1 vector(3));
+insert into vt1 values(1, '[1,1,1]');
+insert into vt1 values(2, '[2,2,2]');
+insert into vt1 values(3, '[3,3,3]');
+insert into vt1 values(4, '[4,4,4]');
+
+select * from vt1;
+
+create vector index v_i on vt1(c1) with(type = ivfflat, distance=l2_distance,lists=1,probes=1);
+
+select * from vt1 order by l2_distance(c1, [1,1,0]) limit 1;
+
+select c1, l2_distance(c1, [1,1,0]) from vt1 order by l2_distance(c1, [1,1,0]) limit 3;
+
+select c1, l2_distance(c1, [1,2,3]) from vt1 order by l2_distance(c1, [1,2,3]) limit 3;
