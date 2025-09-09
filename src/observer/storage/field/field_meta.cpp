@@ -185,7 +185,7 @@ void FieldMeta::lob_type_handle() {
     attr_type_ = AttrType::LOBID;
     attr_len_ = sizeof(LobID);
   }
-  else if (attr_type_ == AttrType::VECTORS && attr_len_ > MAX_INLINE_VECTOR_SIZE) {
+  else if (attr_type_ == AttrType::VECTORS && attr_len_ > MAX_INLINE_VECTOR_SIZE * sizeof(float)) {
     attr_type_ = AttrType::LOBID;
     lob_type_ = AttrType::VECTORS;
     lob_len_ = attr_len_;

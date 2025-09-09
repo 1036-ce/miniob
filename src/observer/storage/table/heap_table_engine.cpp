@@ -622,43 +622,6 @@ RC HeapTableEngine::create_vector_index(Trx *trx, const FieldMeta &field_meta, c
 
   indexes_.push_back(index);
 
-  /// 接下来将这个索引放到表的元数据中
-/*   TableMeta new_table_meta(*table_meta_);
- *   rc = new_table_meta.add_index(new_index_meta);
- *   if (rc != RC::SUCCESS) {
- *     LOG_ERROR("Failed to add index (%s) on table (%s). error=%d:%s", index_name, table_meta_->name(), rc, strrc(rc));
- *     return rc;
- *   }
- * 
- *   /// 内存中有一份元数据，磁盘文件也有一份元数据。修改磁盘文件时，先创建一个临时文件，写入完成后再rename为正式文件
- *   /// 这样可以防止文件内容不完整
- *   // 创建元数据临时文件
- *   string  tmp_file = table_meta_file(db_->path().c_str(), table_meta_->name()) + ".tmp";
- *   fstream fs;
- *   fs.open(tmp_file, ios_base::out | ios_base::binary | ios_base::trunc);
- *   if (!fs.is_open()) {
- *     LOG_ERROR("Failed to open file for write. file name=%s, errmsg=%s", tmp_file.c_str(), strerror(errno));
- *     return RC::IOERR_OPEN;  // 创建索引中途出错，要做还原操作
- *   }
- *   if (new_table_meta.serialize(fs) < 0) {
- *     LOG_ERROR("Failed to dump new table meta to file: %s. sys err=%d:%s", tmp_file.c_str(), errno, strerror(errno));
- *     return RC::IOERR_WRITE;
- *   }
- *   fs.close();
- * 
- *   // 覆盖原始元数据文件
- *   string meta_file = table_meta_file(db_->path().c_str(), table_meta_->name());
- * 
- *   int ret = rename(tmp_file.c_str(), meta_file.c_str());
- *   if (ret != 0) {
- *     LOG_ERROR("Failed to rename tmp meta file (%s) to normal meta file (%s) while creating index (%s) on table (%s). "
- *               "system error=%d:%s",
- *               tmp_file.c_str(), meta_file.c_str(), index_name, table_meta_->name(), errno, strerror(errno));
- *     return RC::IOERR_WRITE;
- *   }
- * 
- *   table_meta_->swap(new_table_meta); */
-
   LOG_INFO("Successfully added a new index (%s) on the table (%s)", index_name, table_meta_->name());
   return rc;
 

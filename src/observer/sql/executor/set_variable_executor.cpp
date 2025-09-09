@@ -50,7 +50,11 @@ RC SetVariableExecutor::execute(SQLStageEvent *sql_event)
       session->set_use_cascade(bool_value);
       LOG_TRACE("set use_cascade to %d", bool_value);
     }
-  } else {
+  } else if (strcasecmp(var_name, "names") == 0) {
+    // for ann_benchmark
+    return RC::SUCCESS;
+  } 
+  else {
     rc = RC::VARIABLE_NOT_EXISTS;
   }
 

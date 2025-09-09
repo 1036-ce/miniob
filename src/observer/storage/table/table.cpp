@@ -226,7 +226,7 @@ bool Table::has_lob_type(span<const AttrInfoSqlNode> attributes) {
     if (attr.type == AttrType::TEXT) {
       return true;
     }
-    if (attr.type == AttrType::VECTORS && attr.length > MAX_INLINE_VECTOR_SIZE) {
+    if (attr.type == AttrType::VECTORS && attr.length > MAX_INLINE_VECTOR_SIZE * sizeof(float)) {
       return true;
     }
   }

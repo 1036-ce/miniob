@@ -46,7 +46,8 @@ RC IvfflatIndex::open(Table *table, const char *file_name, const IndexMeta &inde
   return RC::SUCCESS;
 }
 
-vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, int limit) { 
+vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, int limit)
+{
 
   if (need_retrain()) {
     RC rc = kmeans_train();
@@ -80,8 +81,7 @@ vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, int limit
   for (size_t i = 0; i < centers_.size(); ++i) {
     if (center_idx_pq.size() < static_cast<size_t>(probes_)) {
       center_idx_pq.push(i);
-    }
-    else {
+    } else {
       if (center_comp(i, center_idx_pq.top())) {
         center_idx_pq.pop();
         center_idx_pq.push(i);
@@ -93,11 +93,10 @@ vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, int limit
   while (!center_idx_pq.empty()) {
     int center_idx = center_idx_pq.top();
     center_idx_pq.pop();
-    for (size_t rid_idx: clusters_.at(center_idx)) {
+    for (size_t rid_idx : clusters_.at(center_idx)) {
       if (rid_idx_pq.size() < limit) {
         rid_idx_pq.push(rid_idx);
-      }
-      else {
+      } else {
         if (value_comp(rid_idx, rid_idx_pq.top())) {
           rid_idx_pq.pop();
           rid_idx_pq.push(rid_idx);
@@ -163,19 +162,32 @@ RC IvfflatIndex::kmeans_init()
   centers_.push_back(values_.at(idx));
   clusters_.emplace_back();
 
-  for (int i = 1; i < lists_; ++i) {
-    vector<float> dists;
-    for (const Value &value : values_) {
-      float dist;
-      int   center_idx;
-      if (OB_FAIL(rc = get_nearest_center_distance(value, dist, center_idx))) {
-        return rc;
-      }
-      dists.push_back(dist);
+  vector<float>  nearest_dists;
+  nearest_dists.reserve(values_.size());
+  for (const Value &value : values_) {
+    float dist;
+    if (OB_FAIL(rc = distance(value, centers_.at(0), dist))) {
+      return rc;
     }
-    idx = choose(dists, distr(engine));
+    nearest_dists.push_back(dist);
+  }
+
+  for (int i = 1; i < lists_; ++i) {
+    idx = choose(nearest_dists, distr(engine));
     centers_.push_back(values_.at(idx));
     clusters_.emplace_back();
+
+    for (size_t j = 0; j < values_.size(); ++j) {
+      const Value& value = values_.at(j);
+      float old_dist = nearest_dists.at(j);
+      float new_dist;
+      if (OB_FAIL(rc = distance(value, centers_.back(), new_dist))) {
+        return rc;
+      }
+      if (new_dist < old_dist) {
+        nearest_dists.at(j) = new_dist;
+      }
+    }
   }
 
   return RC::SUCCESS;
@@ -197,12 +209,15 @@ RC IvfflatIndex::kmeans_train()
     return RC::SUCCESS;
   }
 
+  LOG_INFO("init begin");
   if (OB_FAIL(rc = kmeans_init())) {
     return rc;
   }
+  LOG_INFO("init done");
 
   int max_iter_count = 10;
   while (max_iter_count--) {
+    LOG_INFO("iterate begin");
     vector<Value> new_centers(lists_);
     for (int i = 0; i < lists_; ++i) {
       clusters_.at(i).clear();
@@ -224,9 +239,9 @@ RC IvfflatIndex::kmeans_train()
 
     // get new centers
     for (int i = 0; i < lists_; ++i) {
-      Value &new_center    = new_centers.at(i);
-      auto   vec       = new_center.get_vector();
-      float  inv_count = 1.0 / static_cast<float>(clusters_.at(i).size());
+      Value &new_center = new_centers.at(i);
+      auto   vec        = new_center.get_vector();
+      float  inv_count  = 1.0 / static_cast<float>(clusters_.at(i).size());
       for (auto &val : *vec) {
         val = val * inv_count;
       }
@@ -235,7 +250,7 @@ RC IvfflatIndex::kmeans_train()
     bool has_converged = true;
     for (int i = 0; i < lists_; ++i) {
       const auto &new_center = new_centers.at(i);
-      auto &old_center = centers_.at(i);
+      auto       &old_center = centers_.at(i);
       float       dist;
       if (OB_FAIL(rc = distance(new_center, old_center, dist))) {
         return rc;
@@ -251,6 +266,7 @@ RC IvfflatIndex::kmeans_train()
       trained_ = true;
       return RC::SUCCESS;
     }
+    LOG_INFO("iterate end");
   }
 
   LOG_INFO("train done because touch max_iter_count");
@@ -290,9 +306,9 @@ float IvfflatIndex::get_match_score(const TableGetLogicalOperator &oper)
   return 1.0;
 }
 
-unique_ptr<PhysicalOperator> IvfflatIndex::gen_physical_oper(const TableGetLogicalOperator &oper) 
+unique_ptr<PhysicalOperator> IvfflatIndex::gen_physical_oper(const TableGetLogicalOperator &oper)
 {
-  auto& orderby = oper.orderby();
+  auto &orderby = oper.orderby();
   if (orderby == nullptr || orderby->type() != ExprType::VECTOR_FUNC) {
     return nullptr;
   }
@@ -304,12 +320,10 @@ unique_ptr<PhysicalOperator> IvfflatIndex::gen_physical_oper(const TableGetLogic
 
   ValueExpr *val_expr;
   if (vec_func_expr->left_child()->type() == ExprType::VALUE) {
-    val_expr = static_cast<ValueExpr*>(vec_func_expr->left_child().get());
-  }
-  else if (vec_func_expr->right_child()->type() == ExprType::VALUE) {
-    val_expr = static_cast<ValueExpr*>(vec_func_expr->right_child().get());
-  }
-  else {
+    val_expr = static_cast<ValueExpr *>(vec_func_expr->left_child().get());
+  } else if (vec_func_expr->right_child()->type() == ExprType::VALUE) {
+    val_expr = static_cast<ValueExpr *>(vec_func_expr->right_child().get());
+  } else {
     return nullptr;
   }
 
@@ -404,10 +418,11 @@ int IvfflatIndex::choose(const vector<float> &dists, float rand)
   return dists.size() - 1;
 }
 
-void IvfflatIndex::remove_deleted() {
+void IvfflatIndex::remove_deleted()
+{
   size_t size = rids_.size();
-  size_t pre = 0;
-  size_t cur = 0;
+  size_t pre  = 0;
+  size_t cur  = 0;
 
   while (pre < size && rids_.at(pre) == RID::invalid_rid()) {
     ++pre;
@@ -430,7 +445,8 @@ void IvfflatIndex::remove_deleted() {
   }
 }
 
-bool IvfflatIndex::need_retrain() {
+bool IvfflatIndex::need_retrain()
+{
   float change_num = insert_num_after_train_ + delete_num_after_train_;
   float total_size = static_cast<float>(std::max<int>(values_.size(), 1));
   if (change_num / total_size > 0.2) {

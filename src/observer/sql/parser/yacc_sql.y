@@ -1123,6 +1123,14 @@ set_variable_stmt:
       $$->set_variable.value = *$4;
       delete $4;
     }
+    | SET ID ID
+    {
+      $$ = new ParsedSqlNode(SCF_SET_VARIABLE);
+      $$->set_variable.name  = $2;
+      char *tmp = common::substr($3,1,strlen($3)-2);
+      $$->set_variable.value = Value(tmp);
+      free(tmp);
+    }
     ;
 
 opt_semicolon: /*empty*/
