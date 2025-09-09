@@ -13,6 +13,3 @@
 [submodule "deps/3rd/replxx"]
 	path = deps/3rd/replxx
 	url = https://github.com/AmokHuginnsson/replxx
-[submodule "ann-benchmarks"]
-	path = ann-benchmarks
-	url = https://github.com/oceanbase/ann-benchmarks.git
