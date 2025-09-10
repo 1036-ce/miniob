@@ -46,83 +46,112 @@ RC IvfflatIndex::open(Table *table, const char *file_name, const IndexMeta &inde
   return RC::SUCCESS;
 }
 
+/* vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, int limit)
+ * {
+ *   if (need_retrain()) {
+ *     RC rc = kmeans_train();
+ *     ASSERT(OB_SUCC(rc), "retrain must be success");
+ *   }
+ *
+ *   Value base_val;
+ *   base_val.set_vector(base_vector);
+ *   auto center_comp = [this, &base_val](size_t lhs, size_t rhs) -> bool {
+ *     float lhs_dist;
+ *     float rhs_dist;
+ *     distance(base_val, centers_.at(lhs), lhs_dist);
+ *     distance(base_val, centers_.at(rhs), rhs_dist);
+ *     return lhs_dist < rhs_dist;
+ *   };
+ *   auto value_comp = [this, &base_val](size_t lhs, size_t rhs) -> bool {
+ *     if (rids_.at(lhs) == RID::invalid_rid()) {
+ *       return false;
+ *     }
+ *     if (rids_.at(rhs) == RID::invalid_rid()) {
+ *       return true;
+ *     }
+ *     float lhs_dist;
+ *     float rhs_dist;
+ *     distance(base_val, values_.at(lhs), lhs_dist);
+ *     distance(base_val, values_.at(rhs), rhs_dist);
+ *     return lhs_dist < rhs_dist;
+ *   };
+ *
+ *   std::priority_queue<size_t, vector<size_t>, decltype(center_comp)> center_idx_pq{center_comp};
+ *   for (size_t i = 0; i < centers_.size(); ++i) {
+ *     if (center_idx_pq.size() < static_cast<size_t>(probes_)) {
+ *       center_idx_pq.push(i);
+ *     } else {
+ *       if (center_comp(i, center_idx_pq.top())) {
+ *         center_idx_pq.pop();
+ *         center_idx_pq.push(i);
+ *       }
+ *     }
+ *   }
+ *
+ *   std::priority_queue<size_t, vector<size_t>, decltype(value_comp)> rid_idx_pq{value_comp};
+ *   while (!center_idx_pq.empty()) {
+ *     int center_idx = center_idx_pq.top();
+ *     center_idx_pq.pop();
+ *     for (size_t rid_idx : clusters_.at(center_idx)) {
+ *       if (rid_idx_pq.size() < limit) {
+ *         rid_idx_pq.push(rid_idx);
+ *       } else {
+ *         if (value_comp(rid_idx, rid_idx_pq.top())) {
+ *           rid_idx_pq.pop();
+ *           rid_idx_pq.push(rid_idx);
+ *         }
+ *       }
+ *     }
+ *   }
+ *
+ *   vector<RID> ret;
+ *   while (!rid_idx_pq.empty()) {
+ *     size_t rid_idx = rid_idx_pq.top();
+ *     rid_idx_pq.pop();
+ *     ret.push_back(rids_.at(rid_idx));
+ *   }
+ *   std::reverse(ret.begin(), ret.end());
+ *
+ *   return ret;
+ * } */
+
 vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, int limit)
 {
-
   if (need_retrain()) {
     RC rc = kmeans_train();
     ASSERT(OB_SUCC(rc), "retrain must be success");
   }
-  unordered_map<size_t, float> distance_cache;
 
   Value base_val;
   base_val.set_vector(base_vector);
-  auto center_comp = [this, &base_val, &distance_cache](size_t lhs, size_t rhs) -> bool {
-    float lhs_dist;
-    float rhs_dist;
-    if (distance_cache.contains(lhs)) {
-      lhs_dist = distance_cache.at(lhs);
-    } else {
-      distance(base_val, centers_.at(lhs), lhs_dist);
-      distance_cache.insert({lhs, lhs_dist});
-    }
-    if (distance_cache.contains(rhs)) {
-      rhs_dist = distance_cache.at(rhs);
-    }
-    else {
-      distance(base_val, centers_.at(rhs), rhs_dist);
-      distance_cache.insert({rhs, rhs_dist});
-    }
-    return lhs_dist < rhs_dist;
-  };
-  auto value_comp = [this, &base_val, &distance_cache](size_t lhs, size_t rhs) -> bool {
-    if (rids_.at(lhs) == RID::invalid_rid()) {
-      return false;
-    }
-    if (rids_.at(rhs) == RID::invalid_rid()) {
-      return true;
-    }
-    float lhs_dist;
-    float rhs_dist;
-    if (distance_cache.contains(lhs)) {
-      lhs_dist = distance_cache.at(lhs);
-    } else {
-      distance(base_val, values_.at(lhs), lhs_dist);
-      distance_cache.insert({lhs, lhs_dist});
-    }
-    if (distance_cache.contains(rhs)) {
-      rhs_dist = distance_cache.at(rhs);
-    }
-    else {
-      distance(base_val, values_.at(rhs), rhs_dist);
-      distance_cache.insert({rhs, rhs_dist});
-    }
-    return lhs_dist < rhs_dist;
-  };
 
-  std::priority_queue<size_t, vector<size_t>, decltype(center_comp)> center_idx_pq{center_comp};
+  std::priority_queue<SearchEntry> center_idx_pq;
   for (size_t i = 0; i < centers_.size(); ++i) {
+    float dist;
+    distance(base_val, centers_.at(i), dist);
     if (center_idx_pq.size() < static_cast<size_t>(probes_)) {
-      center_idx_pq.push(i);
+      center_idx_pq.push(SearchEntry{i, dist});
     } else {
-      if (center_comp(i, center_idx_pq.top())) {
+      if (dist < center_idx_pq.top().distance) {
         center_idx_pq.pop();
-        center_idx_pq.push(i);
+        center_idx_pq.push(SearchEntry{i, dist});
       }
     }
   }
 
-  std::priority_queue<size_t, vector<size_t>, decltype(value_comp)> rid_idx_pq{value_comp};
+  std::priority_queue<SearchEntry> rid_idx_pq;
   while (!center_idx_pq.empty()) {
-    int center_idx = center_idx_pq.top();
+    size_t center_idx = center_idx_pq.top().idx;
     center_idx_pq.pop();
     for (size_t rid_idx : clusters_.at(center_idx)) {
-      if (rid_idx_pq.size() < limit) {
-        rid_idx_pq.push(rid_idx);
+      float dist;
+      distance(base_val, values_.at(rid_idx), dist);
+      if (rid_idx_pq.size() < static_cast<size_t>(limit)) {
+        rid_idx_pq.push(SearchEntry{rid_idx, dist});
       } else {
-        if (value_comp(rid_idx, rid_idx_pq.top())) {
+        if (dist < rid_idx_pq.top().distance) {
           rid_idx_pq.pop();
-          rid_idx_pq.push(rid_idx);
+          rid_idx_pq.push(SearchEntry{rid_idx, dist});
         }
       }
     }
@@ -130,7 +159,7 @@ vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, int limit
 
   vector<RID> ret;
   while (!rid_idx_pq.empty()) {
-    size_t rid_idx = rid_idx_pq.top();
+    size_t rid_idx = rid_idx_pq.top().idx;
     rid_idx_pq.pop();
     ret.push_back(rids_.at(rid_idx));
   }
@@ -292,10 +321,6 @@ RC IvfflatIndex::kmeans_train()
     LOG_INFO("iterate end");
   }
 
-  for (const auto& cluster : clusters_) {
-    LOG_INFO("%d", cluster.size());
-  }
-
   LOG_INFO("train done because touch max_iter_count");
   trained_ = true;
   return RC::SUCCESS;
@@ -411,12 +436,12 @@ RC IvfflatIndex::distance(const Value &left, const Value &right, float &result)
 RC IvfflatIndex::get_nearest_center_distance(const Value &val, float &dist, int &center_idx)
 {
   RC    rc = RC::SUCCESS;
-  float tmp;
   dist       = std::numeric_limits<float>::max();
   center_idx = -1;
 
   for (size_t i = 0; i < centers_.size(); ++i) {
     const auto &center = centers_.at(i);
+    float tmp = 0;
     if (OB_FAIL(rc = distance(center, val, tmp))) {
       return rc;
     }

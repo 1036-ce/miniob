@@ -13,6 +13,15 @@ See the Mulan PSL v2 for more details. */
 #include "common/type/vector_type.h"
 #include "storage/index/index.h"
 
+struct SearchEntry {
+  size_t idx;
+  float distance;
+
+  bool operator<(const SearchEntry& other) const {
+    return this->distance < other.distance;
+  }
+};
+
 /**
  * @brief ivfflat 向量索引
  * @ingroup Index
