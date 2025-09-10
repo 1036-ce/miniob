@@ -94,7 +94,8 @@ RC VectorType::multiply(const Value &left, const Value &right, Value &result) co
   return RC::SUCCESS;
 }
 
-RC VectorType::cast_to(const Value &val, AttrType type, Value &result) const {
+RC VectorType::cast_to(const Value &val, AttrType type, Value &result) const
+{
   RC rc;
   switch (type) {
     case AttrType::CHARS: {
@@ -105,20 +106,18 @@ RC VectorType::cast_to(const Value &val, AttrType type, Value &result) const {
   return rc;
 }
 
-int VectorType::cast_cost(AttrType type) {
+int VectorType::cast_cost(AttrType type)
+{
   switch (type) {
-    case AttrType::VECTORS: 
-      return 0;
-    case AttrType::CHARS:
-      return 2;
-    default:
-      return INT32_MAX;
+    case AttrType::VECTORS: return 0;
+    case AttrType::CHARS: return 2;
+    default: return INT32_MAX;
   }
 }
 
 RC VectorType::set_value_from_str(Value &val, const string &data) const
 {
-  RC rc = RC::SUCCESS;
+  RC            rc = RC::SUCCESS;
   vector<float> vec;
   const char   *pos = data.c_str();
 
@@ -150,7 +149,7 @@ RC VectorType::set_value_from_str(Value &val, const string &data) const
   return RC::SUCCESS;
 }
 
-RC VectorType::str2float(const char* &pos, float &val) const
+RC VectorType::str2float(const char *&pos, float &val) const
 {
   bool is_neg = false;
   if (*pos == '-') {
@@ -177,8 +176,7 @@ RC VectorType::str2float(const char* &pos, float &val) const
   if (std::isblank(*pos) || *pos == ',' || *pos == ']') {
     val = is_neg ? -val : val;
     return RC::SUCCESS;
-  }
-  else {
+  } else {
     return RC::SCHEMA_FIELD_TYPE_MISMATCH;
   }
 }
@@ -201,7 +199,8 @@ RC VectorType::to_string(const Value &val, string &result) const
   return RC::SUCCESS;
 }
 
-RC VectorType::l2_distance(const Value &left, const Value &right, Value &result) const {
+RC VectorType::l2_distance(const Value &left, const Value &right, Value &result) const
+{
   if (left.attr_type() != AttrType::VECTORS || right.attr_type() != AttrType::VECTORS) {
     return RC::INVALID_ARGUMENT;
   }
@@ -211,9 +210,9 @@ RC VectorType::l2_distance(const Value &left, const Value &right, Value &result)
     return RC::INVALID_ARGUMENT;
   }
 
-  int           size = left_vec->size();
-  float val = 0;
-  float tmp;
+  size_t size = left_vec->size();
+  float  val  = 0;
+  float  tmp;
   for (size_t i = 0; i < size; ++i) {
     tmp = left_vec->at(i) - right_vec->at(i);
     val += tmp * tmp;
@@ -223,7 +222,8 @@ RC VectorType::l2_distance(const Value &left, const Value &right, Value &result)
   return RC::SUCCESS;
 }
 
-RC VectorType::cosine_distance(const Value &left, const Value &right, Value &result) const {
+RC VectorType::cosine_distance(const Value &left, const Value &right, Value &result) const
+{
   if (left.attr_type() != AttrType::VECTORS || right.attr_type() != AttrType::VECTORS) {
     return RC::INVALID_ARGUMENT;
   }
@@ -233,31 +233,31 @@ RC VectorType::cosine_distance(const Value &left, const Value &right, Value &res
     return RC::INVALID_ARGUMENT;
   }
 
-  int           size = left_vec->size();
-  float val = 0;
-  float up = 0;
-  float left_norm = 0;
+  int   size       = left_vec->size();
+  float val        = 0;
+  float up         = 0;
+  float left_norm  = 0;
   float right_norm = 0;
   for (int i = 0; i < size; ++i) {
     up += left_vec->at(i) * right_vec->at(i);
     left_norm += left_vec->at(i) * left_vec->at(i);
     right_norm += right_vec->at(i) * right_vec->at(i);
   }
-  left_norm = std::sqrt(left_norm);
+  left_norm  = std::sqrt(left_norm);
   right_norm = std::sqrt(right_norm);
 
   if (left_norm == 0 || right_norm == 0) {
     result.set_float(0);
     result.set_null(true);
-  }
-  else {
-    val = 1 - up/(left_norm * right_norm);
+  } else {
+    val = 1 - up / (left_norm * right_norm);
     result.set_float(val);
   }
   return RC::SUCCESS;
 }
 
-RC VectorType::inner_product(const Value &left, const Value &right, Value &result) const {
+RC VectorType::inner_product(const Value &left, const Value &right, Value &result) const
+{
   if (left.attr_type() != AttrType::VECTORS || right.attr_type() != AttrType::VECTORS) {
     return RC::INVALID_ARGUMENT;
   }
@@ -267,8 +267,8 @@ RC VectorType::inner_product(const Value &left, const Value &right, Value &resul
     return RC::INVALID_ARGUMENT;
   }
 
-  int           size = left_vec->size();
-  float val = 0;
+  int   size = left_vec->size();
+  float val  = 0;
   for (int i = 0; i < size; ++i) {
     val += left_vec->at(i) * right_vec->at(i);
   }

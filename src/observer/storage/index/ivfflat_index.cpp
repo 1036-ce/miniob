@@ -292,6 +292,10 @@ RC IvfflatIndex::kmeans_train()
     LOG_INFO("iterate end");
   }
 
+  for (const auto& cluster : clusters_) {
+    LOG_INFO("%d", cluster.size());
+  }
+
   LOG_INFO("train done because touch max_iter_count");
   trained_ = true;
   return RC::SUCCESS;

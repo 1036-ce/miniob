@@ -215,6 +215,7 @@ extern Log *g_log;
         (int32_t)__LINE__);                                                \
   }
 
+#ifdef DEBUG
 #define LOG_OUTPUT(level, fmt, ...)                                    \
   do {                                                                 \
     using namespace common;                                            \
@@ -224,6 +225,9 @@ extern Log *g_log;
       g_log->output(level, __FILE_NAME__, prefix, fmt, ##__VA_ARGS__); \
     }                                                                  \
   } while (0)
+#else
+#define LOG_OUTPUT(level, fmt, ...) do { } while (0)
+#endif
 
 #define LOG_DEFAULT(fmt, ...) LOG_OUTPUT(common::g_log->get_log_level(), fmt, ##__VA_ARGS__)
 #define LOG_PANIC(fmt, ...) LOG_OUTPUT(common::LOG_LEVEL_PANIC, fmt, ##__VA_ARGS__)
