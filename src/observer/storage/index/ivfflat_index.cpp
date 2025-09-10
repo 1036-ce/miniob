@@ -215,7 +215,7 @@ RC IvfflatIndex::kmeans_train()
   }
   LOG_INFO("init done");
 
-  int max_iter_count = 10;
+  int max_iter_count = 1;
   while (max_iter_count--) {
     LOG_INFO("iterate begin");
     vector<Value> new_centers(lists_);
@@ -255,7 +255,7 @@ RC IvfflatIndex::kmeans_train()
       if (OB_FAIL(rc = distance(new_center, old_center, dist))) {
         return rc;
       }
-      if (std::abs(dist) > 1e-3) {
+      if (std::abs(dist) > 0.1) {
         has_converged = false;
       }
       old_center = new_center;
