@@ -214,7 +214,7 @@ RC VectorType::l2_distance(const Value &left, const Value &right, Value &result)
   int           size = left_vec->size();
   float val = 0;
   float tmp;
-  for (int i = 0; i < size; ++i) {
+  for (size_t i = 0; i < size; ++i) {
     tmp = left_vec->at(i) - right_vec->at(i);
     val += tmp * tmp;
   }

@@ -53,17 +53,29 @@ vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, int limit
     RC rc = kmeans_train();
     ASSERT(OB_SUCC(rc), "retrain must be success");
   }
+  unordered_map<size_t, float> distance_cache;
 
   Value base_val;
   base_val.set_vector(base_vector);
-  auto center_comp = [this, &base_val](size_t lhs, size_t rhs) -> bool {
+  auto center_comp = [this, &base_val, &distance_cache](size_t lhs, size_t rhs) -> bool {
     float lhs_dist;
     float rhs_dist;
-    distance(base_val, centers_.at(lhs), lhs_dist);
-    distance(base_val, centers_.at(rhs), rhs_dist);
+    if (distance_cache.contains(lhs)) {
+      lhs_dist = distance_cache.at(lhs);
+    } else {
+      distance(base_val, centers_.at(lhs), lhs_dist);
+      distance_cache.insert({lhs, lhs_dist});
+    }
+    if (distance_cache.contains(rhs)) {
+      rhs_dist = distance_cache.at(rhs);
+    }
+    else {
+      distance(base_val, centers_.at(rhs), rhs_dist);
+      distance_cache.insert({rhs, rhs_dist});
+    }
     return lhs_dist < rhs_dist;
   };
-  auto value_comp = [this, &base_val](size_t lhs, size_t rhs) -> bool {
+  auto value_comp = [this, &base_val, &distance_cache](size_t lhs, size_t rhs) -> bool {
     if (rids_.at(lhs) == RID::invalid_rid()) {
       return false;
     }
@@ -72,8 +84,19 @@ vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, int limit
     }
     float lhs_dist;
     float rhs_dist;
-    distance(base_val, values_.at(lhs), lhs_dist);
-    distance(base_val, values_.at(rhs), rhs_dist);
+    if (distance_cache.contains(lhs)) {
+      lhs_dist = distance_cache.at(lhs);
+    } else {
+      distance(base_val, values_.at(lhs), lhs_dist);
+      distance_cache.insert({lhs, lhs_dist});
+    }
+    if (distance_cache.contains(rhs)) {
+      rhs_dist = distance_cache.at(rhs);
+    }
+    else {
+      distance(base_val, values_.at(rhs), rhs_dist);
+      distance_cache.insert({rhs, rhs_dist});
+    }
     return lhs_dist < rhs_dist;
   };
 
@@ -162,7 +185,7 @@ RC IvfflatIndex::kmeans_init()
   centers_.push_back(values_.at(idx));
   clusters_.emplace_back();
 
-  vector<float>  nearest_dists;
+  vector<float> nearest_dists;
   nearest_dists.reserve(values_.size());
   for (const Value &value : values_) {
     float dist;
@@ -178,9 +201,9 @@ RC IvfflatIndex::kmeans_init()
     clusters_.emplace_back();
 
     for (size_t j = 0; j < values_.size(); ++j) {
-      const Value& value = values_.at(j);
-      float old_dist = nearest_dists.at(j);
-      float new_dist;
+      const Value &value    = values_.at(j);
+      float        old_dist = nearest_dists.at(j);
+      float        new_dist;
       if (OB_FAIL(rc = distance(value, centers_.back(), new_dist))) {
         return rc;
       }
