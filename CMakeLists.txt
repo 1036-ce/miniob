@@ -19,7 +19,7 @@ string(TOLOWER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_LOWER)
 # 输出当前构建类型
 message(STATUS "Using build type: ${CMAKE_BUILD_TYPE}")
 
-OPTION(ENABLE_ASAN "Enable build with address sanitizer" OFF)
+OPTION(ENABLE_ASAN "Enable build with address sanitizer" ON)
 OPTION(ENABLE_TSAN "Build with thread sanitizer" OFF)
 OPTION(ENABLE_UBSAN "Build with undefined behavior sanitizer" OFF)
 OPTION(WITH_UNIT_TESTS "Compile miniob with unit tests" ON)
