@@ -64,7 +64,7 @@ RC HeapTableEngine::make_record(int value_num, const Value *values, Record &reco
   // 复制所有字段的值
   int   record_size = table_meta_->record_size();
   char *record_data = (char *)malloc(record_size);
-  // memset(record_data, 0, record_size);
+  memset(record_data, 0, record_size);
 
   // 如果有`__null_bitmap`字段，制作bitmap类型的值并填充该字段
   if (has_nullable_field == 1) {
