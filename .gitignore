@@ -35,3 +35,9 @@ miniob/*
 .gdbinit
 observer.log.*
 .miniob.history
+
+ann-benchmarks
+flame.sh
+flame_draw.sh
+draw.sh
+perf*
