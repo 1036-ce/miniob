@@ -9,7 +9,7 @@ local tools_dir = root_dir .. "tools/"
 utils.create_user_command("Build",
 function()
   local build_win_name = "build"
-  local cmd = "cd " .. root_dir .. " && ./build.sh --make -j24"
+  local cmd = "cd " .. root_dir .. " && ./build.sh release --make -j24"
   utils.tmux_new_window(build_win_name, "zsh", root_dir)
   utils.tmux_exit_copy_mode(build_win_name, root_dir)
   utils.tmux_send_keys(build_win_name, cmd, root_dir)
