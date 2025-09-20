@@ -52,6 +52,7 @@ vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, int limit
     RC rc = kmeans_train();
     ASSERT(OB_SUCC(rc), "retrain must be success");
   }
+  return {rids_[0]};
 
   Value base_val;
   base_val.set_vector(base_vector);
