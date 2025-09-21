@@ -198,7 +198,7 @@ RC IvfflatIndex::kmeans_train()
   }
   LOG_INFO("init done");
 
-  int max_iter_count = 6;
+  int max_iter_count = 1;
   while (max_iter_count--) {
     LOG_INFO("iterate begin");
     vector<Value> new_centers(lists_);
