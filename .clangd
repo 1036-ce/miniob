@@ -6,3 +6,4 @@ CompileFlags:
   ]
 Diagnostics:
   UnusedIncludes: None
+  Suppress: builtin_definition

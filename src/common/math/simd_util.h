@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 #if defined(USE_SIMD)
 #include <immintrin.h>
 
+
 static constexpr int SIMD_WIDTH = 8;  // AVX2 (256bit)
 
 /// @brief 从 vec 中提取下标为 i 的 int 类型的值。

@@ -209,7 +209,7 @@ void compare_operation(T *left, T *right, int n, vector<uint8_t> &result)
 {
 #if defined(USE_SIMD)
   int           i          = 0;
-  if constexpr (is_same<T, float>::value) {
+  if constexpr (std::is_same<T, float>::value) {
     for (; i <= n - SIMD_WIDTH; i += SIMD_WIDTH) {
       __m256 left_value, right_value;
 
@@ -232,7 +232,7 @@ void compare_operation(T *left, T *right, int n, vector<uint8_t> &result)
         result[i + j] &= mm256_extract_epi32_var_indx(mask, j) ? 1 : 0;
       }
     }
-  } else if constexpr (is_same<T, int>::value) {
+  } else if constexpr (std::is_same<T, int>::value) {
     for (; i <= n - SIMD_WIDTH; i += SIMD_WIDTH) {
       __m256i left_value, right_value;
 
@@ -276,7 +276,7 @@ void binary_operator(T *left_data, T *right_data, T *result_data, int size)
 #if defined(USE_SIMD)
   int i = 0;
 
-  if constexpr (is_same<T, float>::value) {
+  if constexpr (std::is_same<T, float>::value) {
     for (; i <= size - SIMD_WIDTH; i += SIMD_WIDTH) {
       __m256 left_value, right_value;
 
@@ -295,7 +295,7 @@ void binary_operator(T *left_data, T *right_data, T *result_data, int size)
       __m256 result_value = OP::operation(left_value, right_value);
       _mm256_storeu_ps(&result_data[i], result_value);
     }
-  } else if constexpr (is_same<T, int>::value) {
+  } else if constexpr (std::is_same<T, int>::value) {
     for (; i <= size - SIMD_WIDTH; i += SIMD_WIDTH) {
       __m256i left_value, right_value;
 

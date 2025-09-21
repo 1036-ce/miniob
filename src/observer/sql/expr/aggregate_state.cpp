@@ -12,14 +12,15 @@ See the Mulan PSL v2 for more details. */
 
 #ifdef USE_SIMD
 #include "common/math/simd_util.h"
+#include <type_traits>
 #endif
 template <typename T>
 void SumState<T>::update(const T *values, int size)
 {
 #ifdef USE_SIMD
-  if constexpr (is_same<T, float>::value) {
+  if constexpr (std::is_same<T, float>::value) {
     value += mm256_sum_ps(values, size);
-  } else if constexpr (is_same<T, int>::value) {
+  } else if constexpr (std::is_same<T, int>::value) {
     value += mm256_sum_epi32(values, size);
   }
 #else
