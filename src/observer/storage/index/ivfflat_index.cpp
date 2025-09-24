@@ -59,7 +59,7 @@ vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, int limit
   std::priority_queue<SearchEntry> center_idx_pq;
   for (size_t i = 0; i < centers_.size(); ++i) {
     float dist;
-    distance(base_val, centers_.at(i), dist);
+    distance_relative(base_val, centers_.at(i), dist);
     if (center_idx_pq.size() < static_cast<size_t>(probes_)) {
       center_idx_pq.push(SearchEntry{i, dist});
     } else {
@@ -76,7 +76,7 @@ vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, int limit
     center_idx_pq.pop();
     for (size_t rid_idx : clusters_.at(center_idx)) {
       float dist;
-      distance(base_val, values_.at(rid_idx), dist);
+      distance_relative(base_val, values_.at(rid_idx), dist);
       if (rid_idx_pq.size() < static_cast<size_t>(limit)) {
         rid_idx_pq.push(SearchEntry{rid_idx, dist});
       } else {
@@ -351,6 +351,26 @@ RC IvfflatIndex::distance(const Value &left, const Value &right, float &result)
   switch (func_type_) {
     case VectorFuncType::L2_DISTANCE: {
       rc = VectorType{}.l2_distance(left, right, tmp);
+    } break;
+    case VectorFuncType::COSINE_DISTANCE: {
+      rc = VectorType{}.cosine_distance(left, right, tmp);
+    } break;
+    case VectorFuncType::INNER_PRODUCT: {
+      rc = VectorType{}.inner_product(left, right, tmp);
+    } break;
+    default: return RC::INVALID_ARGUMENT;
+  }
+  result = tmp.get_float();
+  return rc;
+}
+
+RC IvfflatIndex::distance_relative(const Value &left, const Value &right, float &result)
+{
+  RC    rc = RC::SUCCESS;
+  Value tmp;
+  switch (func_type_) {
+    case VectorFuncType::L2_DISTANCE: {
+      rc = VectorType{}.l2_distance_square(left, right, tmp);
     } break;
     case VectorFuncType::COSINE_DISTANCE: {
       rc = VectorType{}.cosine_distance(left, right, tmp);

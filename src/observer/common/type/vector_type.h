@@ -42,6 +42,7 @@ public:
   RC to_string(const Value &val, string &result) const override;
 
   RC l2_distance(const Value &left, const Value &right, Value &result) const;
+  RC l2_distance_square(const Value &left, const Value &right, Value &result) const;
   RC cosine_distance(const Value &left, const Value &right, Value &result) const;
   RC inner_product(const Value &left, const Value &right, Value &result) const;
 
