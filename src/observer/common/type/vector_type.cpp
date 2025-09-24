@@ -199,6 +199,16 @@ RC VectorType::to_string(const Value &val, string &result) const
   return RC::SUCCESS;
 }
 
+float l2_distance_aux(const float *lhs, const float *rhs, size_t size)
+{
+	float ret = 0;
+	for (size_t pos = 0; pos < size; ++pos) {
+		float tmp = lhs[pos] - rhs[pos];
+		ret += tmp * tmp;
+	}
+	return std::sqrt(ret);
+}
+
 RC VectorType::l2_distance(const Value &left, const Value &right, Value &result) const
 {
   if (left.attr_type() != AttrType::VECTORS || right.attr_type() != AttrType::VECTORS) {
@@ -210,14 +220,15 @@ RC VectorType::l2_distance(const Value &left, const Value &right, Value &result)
     return RC::INVALID_ARGUMENT;
   }
 
-  size_t size = left_vec->size();
-  float  val  = 0;
-  float  tmp;
-  for (size_t i = 0; i < size; ++i) {
-    tmp = left_vec->at(i) - right_vec->at(i);
-    val += tmp * tmp;
-  }
-  val = std::sqrt(val);
+  /* size_t size = left_vec->size();
+   * float  val  = 0;
+   * float  tmp;
+   * for (size_t i = 0; i < size; ++i) {
+   *   tmp = left_vec->at(i) - right_vec->at(i);
+   *   val += tmp * tmp;
+   * }
+   * val = std::sqrt(val); */
+  float val = l2_distance_aux(left_vec->data(), right_vec->data(), left_vec->size());
   result.set_float(val);
   return RC::SUCCESS;
 }

@@ -43,6 +43,8 @@ public:
   const Value *values() const { return values_.data(); }
   int          value_amount() const { return values_.size(); }
 
+  vector<Value> &values() { return values_; }
+
 private:
   static RC create(Table *table, const vector<Value> &values, Stmt *&stmt);
 

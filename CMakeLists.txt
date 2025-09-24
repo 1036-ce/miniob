@@ -30,7 +30,7 @@ OPTION(ENABLE_COVERAGE "Enable unittest coverage" OFF)
 OPTION(ENABLE_NOPIE "Enable no pie" OFF)
 OPTION(CONCURRENCY "Support concurrency operations" OFF)
 OPTION(STATIC_STDLIB "Link std library static or dynamic, such as libgcc, libstdc++, libasan" OFF)
-OPTION(USE_SIMD "Use SIMD" OFF)
+OPTION(USE_SIMD "Use SIMD" ON)
 OPTION(USE_MUSL_LIBC "Use musl libc" OFF)
 OPTION(WITH_CPPLINGS "Compile cpplings" ON)
 
