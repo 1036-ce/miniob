@@ -46,59 +46,6 @@ RC IvfflatIndex::open(Table *table, const char *file_name, const IndexMeta &inde
   return RC::SUCCESS;
 }
 
-/* vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, int limit)
- * {
- *   if (need_retrain()) {
- *     RC rc = kmeans_train();
- *     ASSERT(OB_SUCC(rc), "retrain must be success");
- *   }
- *
- *   Value base_val;
- *   base_val.set_vector(base_vector);
- *
- *   std::priority_queue<SearchEntry> center_idx_pq;
- *   for (size_t i = 0; i < centers_.size(); ++i) {
- *     float dist;
- *     distance_relative(base_val, centers_.at(i), dist);
- *     if (center_idx_pq.size() < static_cast<size_t>(probes_)) {
- *       center_idx_pq.push(SearchEntry{i, dist});
- *     } else {
- *       if (dist < center_idx_pq.top().distance) {
- *         center_idx_pq.pop();
- *         center_idx_pq.push(SearchEntry{i, dist});
- *       }
- *     }
- *   }
- *
- *   std::priority_queue<SearchEntry> rid_idx_pq;
- *   while (!center_idx_pq.empty()) {
- *     size_t center_idx = center_idx_pq.top().idx;
- *     center_idx_pq.pop();
- *     for (size_t rid_idx : clusters_.at(center_idx)) {
- *       float dist;
- *       distance_relative(base_val, values_.at(rid_idx), dist);
- *       if (rid_idx_pq.size() < static_cast<size_t>(limit)) {
- *         rid_idx_pq.push(SearchEntry{rid_idx, dist});
- *       } else {
- *         if (dist < rid_idx_pq.top().distance) {
- *           rid_idx_pq.pop();
- *           rid_idx_pq.push(SearchEntry{rid_idx, dist});
- *         }
- *       }
- *     }
- *   }
- *
- *   vector<RID> ret;
- *   while (!rid_idx_pq.empty()) {
- *     size_t rid_idx = rid_idx_pq.top().idx;
- *     rid_idx_pq.pop();
- *     ret.push_back(rids_.at(rid_idx));
- *   }
- *   std::reverse(ret.begin(), ret.end());
- *
- *   return ret;
- * } */
-
 vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, int limit)
 {
   if (need_retrain()) {
@@ -109,30 +56,37 @@ vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, int limit
   Value base_val;
   base_val.set_vector(base_vector);
 
-  std::vector<SearchEntry> centers(centers_.size());
-  for (size_t i = 0; i < centers_.size(); i++) {
-    float dist =0;
-    distance_relative(base_val, centers_[i], dist);
-    centers[i] = {i, dist};
+  std::priority_queue<SearchEntry> center_idx_pq;
+  for (size_t i = 0; i < centers_.size(); ++i) {
+    float dist;
+    distance_relative(base_val, centers_.at(i), dist);
+    if (center_idx_pq.size() < static_cast<size_t>(probes_)) {
+      // center_idx_pq.push(SearchEntry{i, dist});
+      center_idx_pq.emplace(i, dist);
+    } else {
+      if (dist < center_idx_pq.top().distance) {
+        center_idx_pq.pop();
+        // center_idx_pq.push(SearchEntry{i, dist});
+        center_idx_pq.emplace(i, dist);
+      }
+    }
   }
-  std::nth_element(centers.begin(), centers.begin() + probes_, centers.end(), [](auto &a, auto &b) {
-    return a.distance < b.distance;
-  });
-  centers.resize(probes_);
 
   std::priority_queue<SearchEntry> rid_idx_pq;
-  for (const auto &center: centers) {
-    size_t center_idx = center.idx;
-    // center_idx_pq.pop();
+  while (!center_idx_pq.empty()) {
+    size_t center_idx = center_idx_pq.top().idx;
+    center_idx_pq.pop();
     for (size_t rid_idx : clusters_.at(center_idx)) {
       float dist;
       distance_relative(base_val, values_.at(rid_idx), dist);
       if (rid_idx_pq.size() < static_cast<size_t>(limit)) {
-        rid_idx_pq.push(SearchEntry{rid_idx, dist});
+        // rid_idx_pq.push(SearchEntry{rid_idx, dist});
+        rid_idx_pq.emplace(rid_idx, dist);
       } else {
         if (dist < rid_idx_pq.top().distance) {
           rid_idx_pq.pop();
-          rid_idx_pq.push(SearchEntry{rid_idx, dist});
+          // rid_idx_pq.push(SearchEntry{rid_idx, dist});
+          rid_idx_pq.emplace(rid_idx, dist);
         }
       }
     }
