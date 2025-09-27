@@ -76,6 +76,7 @@ private:
   RC  distance(const Value &left, const Value &right, float &result);
   // 只用于distance相对大小比较, 速度更快
   RC  distance_relative(const Value &left, const Value &right, float &result);
+  void  more_near_distance(const Value &left, const Value &right, float upper_bound, float &result);
   RC  get_nearest_center_distance(const Value &val, float &dist, int &center_idx);
   int choose(const vector<float> &dists, float rand);
   void remove_deleted();

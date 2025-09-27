@@ -46,6 +46,59 @@ RC IvfflatIndex::open(Table *table, const char *file_name, const IndexMeta &inde
   return RC::SUCCESS;
 }
 
+/* vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, int limit)
+ * {
+ *   if (need_retrain()) {
+ *     RC rc = kmeans_train();
+ *     ASSERT(OB_SUCC(rc), "retrain must be success");
+ *   }
+ * 
+ *   Value base_val;
+ *   base_val.set_vector(base_vector);
+ * 
+ *   std::priority_queue<SearchEntry> center_idx_pq;
+ *   for (size_t i = 0; i < centers_.size(); ++i) {
+ *     float dist;
+ *     distance_relative(base_val, centers_.at(i), dist);
+ *     if (center_idx_pq.size() < static_cast<size_t>(probes_)) {
+ *       center_idx_pq.emplace(i, dist);
+ *     } else {
+ *       if (dist < center_idx_pq.top().distance) {
+ *         center_idx_pq.pop();
+ *         center_idx_pq.emplace(i, dist);
+ *       }
+ *     }
+ *   }
+ * 
+ *   std::priority_queue<SearchEntry> rid_idx_pq;
+ *   while (!center_idx_pq.empty()) {
+ *     size_t center_idx = center_idx_pq.top().idx;
+ *     center_idx_pq.pop();
+ *     for (size_t rid_idx : clusters_.at(center_idx)) {
+ *       float dist;
+ *       distance_relative(base_val, values_.at(rid_idx), dist);
+ *       if (rid_idx_pq.size() < static_cast<size_t>(limit)) {
+ *         rid_idx_pq.emplace(rid_idx, dist);
+ *       } else {
+ *         if (dist < rid_idx_pq.top().distance) {
+ *           rid_idx_pq.pop();
+ *           rid_idx_pq.emplace(rid_idx, dist);
+ *         }
+ *       }
+ *     }
+ *   }
+ * 
+ *   vector<RID> ret;
+ *   while (!rid_idx_pq.empty()) {
+ *     size_t rid_idx = rid_idx_pq.top().idx;
+ *     rid_idx_pq.pop();
+ *     ret.push_back(rids_.at(rid_idx));
+ *   }
+ *   std::reverse(ret.begin(), ret.end());
+ * 
+ *   return ret;
+ * } */
+
 vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, int limit)
 {
   if (need_retrain()) {
@@ -59,16 +112,19 @@ vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, int limit
   std::priority_queue<SearchEntry> center_idx_pq;
   for (size_t i = 0; i < centers_.size(); ++i) {
     float dist;
-    distance_relative(base_val, centers_.at(i), dist);
     if (center_idx_pq.size() < static_cast<size_t>(probes_)) {
-      // center_idx_pq.push(SearchEntry{i, dist});
+      distance_relative(base_val, centers_.at(i), dist);
       center_idx_pq.emplace(i, dist);
     } else {
-      if (dist < center_idx_pq.top().distance) {
+      more_near_distance(base_val, centers_.at(i), center_idx_pq.top().distance, dist);
+      if (dist != -1) {
         center_idx_pq.pop();
-        // center_idx_pq.push(SearchEntry{i, dist});
         center_idx_pq.emplace(i, dist);
       }
+      /* if (dist < center_idx_pq.top().distance) {
+       *   center_idx_pq.pop();
+       *   center_idx_pq.emplace(i, dist);
+       * } */
     }
   }
 
@@ -78,14 +134,13 @@ vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, int limit
     center_idx_pq.pop();
     for (size_t rid_idx : clusters_.at(center_idx)) {
       float dist;
-      distance_relative(base_val, values_.at(rid_idx), dist);
       if (rid_idx_pq.size() < static_cast<size_t>(limit)) {
-        // rid_idx_pq.push(SearchEntry{rid_idx, dist});
+        distance_relative(base_val, values_.at(rid_idx), dist);
         rid_idx_pq.emplace(rid_idx, dist);
       } else {
-        if (dist < rid_idx_pq.top().distance) {
+        more_near_distance(base_val, values_.at(rid_idx), rid_idx_pq.top().distance, dist);
+        if (dist != -1) {
           rid_idx_pq.pop();
-          // rid_idx_pq.push(SearchEntry{rid_idx, dist});
           rid_idx_pq.emplace(rid_idx, dist);
         }
       }
@@ -386,6 +441,29 @@ RC IvfflatIndex::distance_relative(const Value &left, const Value &right, float 
   }
   result = tmp.get_float();
   return rc;
+}
+
+void IvfflatIndex::more_near_distance(const Value &left, const Value &right, float upper_bound, float &result) 
+{
+  if (func_type_ == VectorFuncType::L2_DISTANCE) {
+    float *lhs  = left.get_vector()->data();
+    float *rhs = right.get_vector()->data();
+    size_t size = left.get_vector()->size();
+    float ret = 0;
+    for (size_t pos = 0; pos < size; ++pos) {
+      float tmp = lhs[pos] - rhs[pos];
+      ret += tmp * tmp;
+      if (ret > upper_bound) {
+        result = -1;
+        return ;
+      }
+    }
+    result = ret;
+    return;
+  }
+  else {
+    distance_relative(left, right, result);
+  }
 }
 
 RC IvfflatIndex::get_nearest_center_distance(const Value &val, float &dist, int &center_idx)
